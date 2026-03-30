@@ -1,93 +1,93 @@
-# Requirements: video_plugin_zlhub_seedance
+# 需求文档: video_plugin_zlhub_seedance
 
-**Defined:** 2026-03-30
-**Core Value:** 新增的 zlhub seedance2.0 插件必须在不改宿主程序的前提下，被字字动画稳定加载并完成完整的视频生成主链路。
+**定义日期:** 2026-03-30
+**核心价值:** 新增的 zlhub seedance2.0 插件必须在不改宿主程序的前提下，被字字动画稳定加载并完成完整的视频生成主链路。
 
-## v1 Requirements
+## v1 需求
 
-Requirements for initial release. Each maps to roadmap phases.
+初始版本的需求。每个需求都映射到路线图阶段。
 
-### Plugin Contract (Host Compatibility)
+### 插件契约 (宿主兼容性)
 
-- [ ] **CONT-01**: Implement `get_info()` returning plugin metadata (name, version, icon).
-- [ ] **CONT-02**: Implement `get_params()` returning supported UI configuration schema.
-- [ ] **CONT-03**: Implement `generate(context)` entry point for the host to trigger tasks.
-- [ ] **CONT-04**: Ensure plugin directory structure matches `字字动画.exe` loading requirements.
+- [ ] **CONT-01**: 实现 `get_info()`，返回插件元数据（名称、版本、图标）。
+- [ ] **CONT-02**: 实现 `get_params()`，返回支持的 UI 配置模式。
+- [ ] **CONT-03**: 实现 `generate(context)` 接入点，供宿主触发任务。
+- [ ] **CONT-04**: 确保插件目录结构符合 `字字动画.exe` 的加载要求。
 
-### API Client (ZLHub Seedance 2.0)
+### API 客户端 (ZLHub Seedance 2.0)
 
-- [ ] **API-01**: Implement authentication via `Authorization: Bearer $ARK_API_KEY`.
-- [ ] **API-02**: Implement Task Creation (POST) with support for text and image inputs.
-- [ ] **API-03**: Implement Task Query (GET) for polling status.
-- [ ] **API-04**: Implement Artifact Retrieval (Download) for the generated .mp4 file.
+- [ ] **API-01**: 通过 `Authorization: Bearer $ARK_API_KEY` 实现身份验证。
+- [ ] **API-02**: 实现任务创建 (POST)，支持文本和图像输入。
+- [ ] **API-03**: 实现任务查询 (GET)，用于轮询状态。
+- [ ] **API-04**: 实现产物获取 (Download)，下载生成的 .mp4 文件。
 
-### Task Orchestration
+### 任务编排
 
-- [ ] **ORCH-01**: Implement sequential workflow: parameter validation -> task creation -> status polling -> result download.
-- [ ] **ORCH-02**: Implement polling logic with configurable intervals and max timeout (Seedance recommendation).
-- [ ] **ORCH-03**: Handle task terminal states (completed, failed) and map to plugin outcomes.
+- [ ] **ORCH-01**: 实现顺序工作流：参数校验 -> 任务创建 -> 状态轮询 -> 结果下载。
+- [ ] **ORCH-02**: 实现轮询逻辑，支持可配置的间隔和最大超时时间（Seedance 建议）。
+- [ ] **ORCH-03**: 处理任务终端状态（已完成、失败）并映射到插件结果。
 
-### Media & Parameters
+### 媒体与参数
 
-- [ ] **PARA-01**: Support `resolution` (480p, 720p) and `ratio` (16:9, 9:16, etc.) parameters.
-- [ ] **PARA-02**: Support `duration` (4-15s) and `generate_audio` toggle.
-- [ ] **PARA-03**: Implement physical constraint validation for images (size < 30MB, format, dimensions).
+- [ ] **PARA-01**: 支持 `resolution` (480p, 720p) 和 `ratio` (16:9, 9:16 等) 参数。
+- [ ] **PARA-02**: 支持 `duration` (4-15秒) 和 `generate_audio` 开关。
+- [ ] **PARA-03**: 实现图像的物理约束验证（大小 < 30MB，格式，尺寸）。
 
-### Error & Observability
+### 错误与可观测性
 
-- [ ] **ERR-01**: Map API errors to unified `PLUGIN_ERROR:::` prefix for host display.
-- [ ] **ERR-02**: Implement progress callbacks to update host UI during polling/downloading.
-- [ ] **ERR-03**: Log key lifecycle events (Task ID, status transitions, failures) to local file/console.
+- [ ] **ERR-01**: 将 API 错误映射到统一的 `PLUGIN_ERROR:::` 前缀，以便在宿主显示。
+- [ ] **ERR-02**: 实现进度回调，在轮询/下载期间更新宿主 UI。
+- [ ] **ERR-03**: 将关键生命周期事件（任务 ID、状态转换、失败）记录到本地文件/控制台。
 
-## v2 Requirements
+## v2 需求
 
-Deferred to future release.
+延期到未来版本。
 
-### Advanced Media
+### 高级媒体功能
 
-- **ADV-01**: Support video-to-video (reference_video role).
-- **ADV-02**: Support multiple reference images (role = reference_image).
-- **ADV-03**: Support web_search tool integration.
+- **ADV-01**: 支持视频生视频 (reference_video 角色)。
+- **ADV-02**: 支持多张参考图 (role = reference_image)。
+- **ADV-03**: 支持联网搜索工具集成。
 
-### Operations
+### 运维功能
 
-- **OPS-01**: Advanced retry strategies with exponential backoff (Tenacity).
-- **OPS-02**: Local task history database (SQLite).
+- **OPS-01**: 使用指数退避的高级重试策略 (Tenacity)。
+- **OPS-02**: 本地任务历史数据库 (SQLite)。
 
-## Out of Scope
+## 超出范围
 
-| Feature | Reason |
+| 功能 | 理由 |
 |---------|--------|
-| Host UI Modification | Strictly prohibited by project constraints |
-| Multi-model support | Milestone focus is solely on Seedance 2.0 |
-| Real-time streaming | API is asynchronous task-based |
+| 宿主 UI 修改 | 项目约束严格禁止 |
+| 多模型支持 | 本里程碑仅聚焦于 Seedance 2.0 |
+| 实时流式传输 | API 是基于异步任务的 |
 
-## Traceability
+## 可追溯性
 
-| Requirement | Phase | Status |
+| 需求 ID | 阶段 | 状态 |
 |-------------|-------|--------|
-| CONT-01 | Phase 1 | Pending |
-| CONT-02 | Phase 1 | Pending |
-| CONT-04 | Phase 1 | Pending |
-| PARA-01 | Phase 2 | Pending |
-| PARA-02 | Phase 2 | Pending |
-| PARA-03 | Phase 2 | Pending |
-| API-01 | Phase 3 | Pending |
-| API-02 | Phase 3 | Pending |
-| API-03 | Phase 3 | Pending |
-| API-04 | Phase 3 | Pending |
-| ORCH-01 | Phase 4 | Pending |
-| ORCH-02 | Phase 4 | Pending |
-| ORCH-03 | Phase 4 | Pending |
-| ERR-01 | Phase 5 | Pending |
-| ERR-02 | Phase 5 | Pending |
-| ERR-03 | Phase 5 | Pending |
-| CONT-03 | Phase 5 | Pending |
+| CONT-01 | 阶段 1 | 等待中 |
+| CONT-02 | 阶段 1 | 等待中 |
+| CONT-04 | 阶段 1 | 等待中 |
+| PARA-01 | 阶段 2 | 等待中 |
+| PARA-02 | 阶段 2 | 等待中 |
+| PARA-03 | 阶段 2 | 等待中 |
+| API-01 | 阶段 3 | 等待中 |
+| API-02 | 阶段 3 | 等待中 |
+| API-03 | 阶段 3 | 等待中 |
+| API-04 | 阶段 3 | 等待中 |
+| ORCH-01 | 阶段 4 | 等待中 |
+| ORCH-02 | 阶段 4 | 等待中 |
+| ORCH-03 | 阶段 4 | 等待中 |
+| ERR-01 | 阶段 5 | 等待中 |
+| ERR-02 | 阶段 5 | 等待中 |
+| ERR-03 | 阶段 5 | 等待中 |
+| CONT-03 | 阶段 5 | 等待中 |
 
-**Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17
-- Unmapped: 0 ✓
+**覆盖率:**
+- v1 需求: 共 17 项
+- 已映射到阶段: 17 项
+- 未映射: 0 项 ✓
 
 ---
-*Requirements defined: 2026-03-30*
+*需求定义日期: 2026-03-30*

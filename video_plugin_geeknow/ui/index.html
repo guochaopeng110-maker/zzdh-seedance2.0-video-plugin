@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>GeekNow 视频中转插件</title>
+  <link rel="stylesheet" href="../../../plugin-sdk.css">
+  <style>
+    .register-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .register-row a {
+      color: #0d7377;
+      text-decoration: none;
+    }
+    .register-row a:hover {
+      text-decoration: underline;
+    }
+    .api-key-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .api-key-wrapper input {
+      flex: 1;
+      padding-right: 36px;
+    }
+    .toggle-eye {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+    .toggle-eye:hover {
+      color: var(--text-primary);
+    }
+    .update-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .update-row input { flex: 1; }
+    .update-row button { white-space: nowrap; padding: 5px 12px; }
+    .update-result {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 8px 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .update-result.info { background: rgba(66,165,245,0.1); color: #42a5f5; display: block; }
+    .update-result.success { background: rgba(76,175,80,0.1); color: #4caf50; display: block; }
+    .update-result.error { background: rgba(255,82,82,0.1); color: #ff5252; display: block; }
+    .update-result .confirm-btn {
+      margin-top: 6px;
+      padding: 4px 16px;
+      font-size: 12px;
+    }
+    .model-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      line-height: 1.5;
+    }
+    .hint-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .action-buttons button {
+      flex: 1;
+      padding: 7px 0;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h3>GeekNow 视频中转插件</h3>
+
+  <div class="register-row">
+    <span>还没有账号？</span>
+    <a href="https://www.geeknow.top/" target="_blank">点击注册 GeekNow 账号</a>
+  </div>
+
+  <hr>
+
+  <div class="form-row">
+    <label class="form-label">API Key</label>
+    <div class="form-control">
+      <div class="api-key-wrapper">
+        <input type="password" id="apiKeyInput" placeholder="GeekNow API Key">
+        <button class="toggle-eye" id="toggleEye" type="button">&#128065;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">服务节点</label>
+    <div class="form-control">
+      <select id="baseUrlSelect">
+        <option value="https://www.geeknow.top">海外CN2服务 (https://www.geeknow.top)</option>
+        <option value="https://api.geeknow.top" selected>CDN服务 (https://api.geeknow.top)</option>
+        <option value="https://geek.closeai.icu">国内服务器 (https://geek.closeai.icu)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">更新清单 URL</label>
+    <div class="form-control">
+      <div class="update-row">
+        <input type="text" id="updateManifestUrl" placeholder="留空则不检查更新">
+        <button id="checkUpdateBtn" type="button">检查插件更新</button>
+      </div>
+      <div class="update-result" id="updateResult"></div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">模型</label>
+    <div class="form-control">
+      <select id="modelSelect">
+        <optgroup label="Sora 系列">
+          <option value="sora-2" selected>sora-2</option>
+          <option value="sora-2[vip]">sora-2[vip]</option>
+          <option value="sora2-pro-landscape-25s">sora2-pro-landscape-25s（Pro横屏/25s）</option>
+          <option value="sora2-pro-landscape-hd-10s">sora2-pro-landscape-hd-10s（Pro横屏高清/10s）</option>
+          <option value="sora2-pro-landscape-hd-15s">sora2-pro-landscape-hd-15s（Pro横屏高清/15s）</option>
+          <option value="sora2-pro-portrait-25s">sora2-pro-portrait-25s（Pro竖屏/25s）</option>
+          <option value="sora2-pro-portrait-hd-10s">sora2-pro-portrait-hd-10s（Pro竖屏高清/10s）</option>
+          <option value="sora2-pro-portrait-hd-15s">sora2-pro-portrait-hd-15s（Pro竖屏高清/15s）</option>
+          <option value="sora3">sora3</option>
+        </optgroup>
+        <optgroup label="Veo 系列">
+          <option value="veo_3_1">veo_3_1</option>
+          <option value="veo_3_1-fast">veo_3_1-fast</option>
+        </optgroup>
+        <optgroup label="蛤肉 (Grok) 系列">
+          <option value="grok-video-3">蛤肉3</option>
+          <option value="grok-video-3-pro">蛤肉-pro(10s)</option>
+          <option value="grok-video-3-max">蛤肉-max(15s)</option>
+        </optgroup>
+        <optgroup label="豆包 Seedance">
+          <option value="doubao-seedance-1-5-pro_480p">豆包Seedance1.5Pro-480p</option>
+          <option value="doubao-seedance-1-5-pro_720p">豆包Seedance1.5Pro-720p</option>
+          <option value="doubao-seedance-1-5-pro_1080p">豆包Seedance1.5Pro-1080p</option>
+        </optgroup>
+        <optgroup label="阿里万象 wan2.6">
+          <option value="wan2.6-t2v:1280*720">wan2.6-t2v-1280*720（文生视频，价格较低）</option>
+          <option value="wan2.6-t2v:1920*1080">wan2.6-t2v-1920*1080（文生视频，价格较高）</option>
+          <option value="wan2.6-i2v:1280*720">wan2.6-i2v-1280*720（图生视频，价格较低）</option>
+          <option value="wan2.6-i2v:1920*1080">wan2.6-i2v-1920*1080（图生视频，价格较高）</option>
+        </optgroup>
+        <optgroup label="Vidu 系列">
+          <option value="Vidu-q2">Vidu-q2</option>
+          <option value="Vidu-q2-pro">Vidu-q2-pro</option>
+          <option value="Vidu-q2-turbo">Vidu-q2-turbo</option>
+          <option value="Vidu-q3-pro">Vidu-q3-pro</option>
+          <option value="Vidu-q3-turbo">Vidu-q3-turbo</option>
+          <option value="Vidu-template">Vidu-template</option>
+        </optgroup>
+        <optgroup label="其他模型">
+          <option value="Hunyuan-1.5">Hunyuan-1.5</option>
+          <option value="Mingmou-1.0">Mingmou-1.0</option>
+          <option value="OS-2.0">OS-2.0</option>
+          <option value="GV-3.1">GV-3.1</option>
+          <option value="GV-3.1-fast">GV-3.1-fast</option>
+        </optgroup>
+        <optgroup label="可灵 Kling 系列">
+          <option value="Kling-1.6">Kling-1.6</option>
+          <option value="Kling-2.0">Kling-2.0</option>
+          <option value="Kling-2.1">Kling-2.1</option>
+          <option value="Kling-2.5">Kling-2.5</option>
+          <option value="Kling-2.6">Kling-2.6</option>
+          <option value="Kling-3.0">Kling-3.0</option>
+          <option value="Kling-3.0-Omni">Kling-3.0-Omni</option>
+          <option value="Kling-O1">Kling-O1</option>
+        </optgroup>
+        <optgroup label="海螺 Hailuo 系列">
+          <option value="Hailuo-02">Hailuo-02</option>
+          <option value="Hailuo-2.3">Hailuo-2.3</option>
+          <option value="Hailuo-2.3-fast">Hailuo-2.3-fast</option>
+        </optgroup>
+        <optgroup label="SV / JV 系列">
+          <option value="SV-1.5-pro">SV-1.5-pro</option>
+          <option value="SV-1.0-pro">SV-1.0-pro</option>
+          <option value="SV-1.0-pro-fast">SV-1.0-pro-fast</option>
+          <option value="SV-1.0-lite">SV-1.0-lite</option>
+          <option value="JV-3.0-pro">JV-3.0-pro</option>
+        </optgroup>
+      </select>
+      <div class="model-info" id="modelInfo"></div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">宽高比</label>
+    <div class="form-control">
+      <select id="aspectRatioSelect">
+        <option value="16:9" selected>16:9（横屏）</option>
+        <option value="9:16">9:16（竖屏）</option>
+        <option value="1:1">1:1（方形）</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">视频时长(秒)</label>
+    <div class="form-control">
+      <select id="durationSelect">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15" selected>15</option>
+        <option value="20">20</option>
+        <option value="25">25</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">音频生成</label>
+    <div class="form-control">
+      <select id="audioSelect">
+        <option value="Disabled" selected>无声</option>
+        <option value="Enabled">有声</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">生成模式</label>
+    <div class="form-control">
+      <select id="generationModeSelect">
+        <option value="文生视频" selected>文生视频</option>
+        <option value="首帧生视频">首帧生视频</option>
+        <option value="首尾帧">首尾帧</option>
+        <option value="参考生视频">参考生视频</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row" id="refImageTypeRow">
+    <label class="form-label">参考图片类型</label>
+    <div class="form-control">
+      <select id="refImageTypeSelect">
+        <option value="首帧图片" selected>首帧图片</option>
+        <option value="尾帧图片">尾帧图片</option>
+        <option value="参考图1">参考图1</option>
+        <option value="参考图2">参考图2</option>
+        <option value="参考图3">参考图3</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">超时时间(秒)</label>
+    <div class="form-control">
+      <input type="number" id="timeoutInput" min="60" max="9999" step="1" value="900">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">重试次数</label>
+    <div class="form-control">
+      <input type="number" id="retryCountInput" min="0" max="20" step="1" value="3">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">重试关键词</label>
+    <div class="form-control">
+      <textarea id="retryKeywords" rows="2" placeholder="每行一个关键词，匹配时触发重试"></textarea>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">不重试关键词</label>
+    <div class="form-control">
+      <textarea id="noRetryKeywords" rows="2" placeholder="每行一个关键词，匹配时立即终止"></textarea>
+    </div>
+  </div>
+
+  <p class="hint-text">
+    注意：软件未与任何中转平台达成合作，不对任何中转平台的安全性负责，请谨慎辨别。
+  </p>
+
+  <div class="action-buttons">
+    <button id="btnTaskLog" type="button">任务日志 / 手动拉取</button>
+    <button id="btnLiveLog" type="button">实时日志</button>
+  </div>
+
+  <script src="../../../plugin-sdk.js"></script>
+  <script>
+    /* ===== DOM refs ===== */
+    var apiKeyInput = document.getElementById('apiKeyInput')
+    var toggleEye = document.getElementById('toggleEye')
+    var baseUrlSelect = document.getElementById('baseUrlSelect')
+    var updateManifestUrl = document.getElementById('updateManifestUrl')
+    var checkUpdateBtn = document.getElementById('checkUpdateBtn')
+    var updateResult = document.getElementById('updateResult')
+    var modelSelect = document.getElementById('modelSelect')
+    var modelInfo = document.getElementById('modelInfo')
+    var aspectRatioSelect = document.getElementById('aspectRatioSelect')
+    var durationSelect = document.getElementById('durationSelect')
+    var audioSelect = document.getElementById('audioSelect')
+    var generationModeSelect = document.getElementById('generationModeSelect')
+    var refImageTypeRow = document.getElementById('refImageTypeRow')
+    var refImageTypeSelect = document.getElementById('refImageTypeSelect')
+    var timeoutInput = document.getElementById('timeoutInput')
+    var retryCountInput = document.getElementById('retryCountInput')
+    var retryKeywords = document.getElementById('retryKeywords')
+    var noRetryKeywords = document.getElementById('noRetryKeywords')
+
+    /* ===== 模型说明 ===== */
+    var MODEL_INFO = {
+      'sora-2': 'Sora2：文生视频/首帧生视频；宽高比：16:9/9:16；时长：5/10/15s。',
+      'sora-2[vip]': 'Sora2 VIP：与 sora-2 参数一致。',
+      'sora3': '按秒计费',
+      'sora2-pro-landscape-25s': 'Pro横屏25s：推荐 16:9/25s。',
+      'sora2-pro-landscape-hd-10s': 'Pro横屏高清10s：推荐 16:9/10s。',
+      'sora2-pro-landscape-hd-15s': 'Pro横屏高清15s：推荐 16:9/15s。',
+      'sora2-pro-portrait-25s': 'Pro竖屏25s：推荐 9:16/25s。',
+      'sora2-pro-portrait-hd-10s': 'Pro竖屏高清10s：推荐 9:16/10s。',
+      'sora2-pro-portrait-hd-15s': 'Pro竖屏高清15s：推荐 9:16/15s。',
+      'veo_3_1': 'Veo 3.1：文生视频/首尾帧/参考生视频（参考最多3张且仅16:9）。',
+      'veo_3_1-fast': 'Veo 3.1 Fast：同 veo_3_1。',
+      'grok-video-3': '蛤肉3：文生视频/首帧生视频。',
+      'grok-video-3-pro': '蛤肉 Pro：固定 10s。',
+      'grok-video-3-max': '蛤肉 Max：固定 15s。'
+    }
+
+    /* ===== 眼睛切换 ===== */
+    toggleEye.addEventListener('click', function () {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text'
+        toggleEye.textContent = '\uD83D\uDE48'
+      } else {
+        apiKeyInput.type = 'password'
+        toggleEye.textContent = '\uD83D\uDC41'
+      }
+    })
+
+    /* ===== 模型说明更新 ===== */
+    function updateModelInfo() {
+      var info = MODEL_INFO[modelSelect.value]
+      modelInfo.textContent = info ? '说明：' + info : '模型ID：' + modelSelect.value
+    }
+
+    /* ===== 生成模式 → 控制参考图片类型可见性 ===== */
+    function updateRefImageTypeVisibility() {
+      var mode = generationModeSelect.value
+      refImageTypeRow.style.display = (mode === '文生视频') ? 'none' : ''
+    }
+
+    /* ===== 参数保存 ===== */
+    apiKeyInput.addEventListener('change', function () {
+      PluginSDK.saveParam('api_key', apiKeyInput.value)
+    })
+    baseUrlSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('base_url', baseUrlSelect.value)
+    })
+    updateManifestUrl.addEventListener('change', function () {
+      PluginSDK.saveParam('update_manifest_url', updateManifestUrl.value)
+    })
+    modelSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('model', modelSelect.value)
+      updateModelInfo()
+    })
+    aspectRatioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('aspect_ratio', aspectRatioSelect.value)
+    })
+    durationSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('duration', durationSelect.value)
+    })
+    audioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('audio_generation', audioSelect.value)
+    })
+    generationModeSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('generation_mode', generationModeSelect.value)
+      updateRefImageTypeVisibility()
+    })
+    refImageTypeSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('reference_image_type', refImageTypeSelect.value)
+    })
+    timeoutInput.addEventListener('change', function () {
+      PluginSDK.saveParam('timeout', parseInt(timeoutInput.value) || 900)
+    })
+    retryCountInput.addEventListener('change', function () {
+      PluginSDK.saveParam('retry_count', parseInt(retryCountInput.value) || 0)
+    })
+    retryKeywords.addEventListener('change', function () {
+      PluginSDK.saveParam('retry_error_keywords', retryKeywords.value)
+    })
+    noRetryKeywords.addEventListener('change', function () {
+      PluginSDK.saveParam('no_retry_error_keywords', noRetryKeywords.value)
+    })
+
+    /* ===== 工具函数 ===== */
+    function setSelectValue(selectEl, value) {
+      if (value == null) return
+      var strVal = String(value)
+      for (var i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === strVal) {
+          selectEl.selectedIndex = i
+          return
+        }
+      }
+    }
+
+    /* ===== 初始化参数 ===== */
+    PluginSDK.onReady(function (params) {
+      if (params.api_key) apiKeyInput.value = params.api_key
+      if (params.base_url) setSelectValue(baseUrlSelect, params.base_url)
+      if (params.update_manifest_url) updateManifestUrl.value = params.update_manifest_url
+      if (params.model) setSelectValue(modelSelect, params.model)
+      if (params.aspect_ratio) setSelectValue(aspectRatioSelect, params.aspect_ratio)
+      if (params.duration) setSelectValue(durationSelect, String(params.duration))
+      if (params.audio_generation) setSelectValue(audioSelect, params.audio_generation)
+      if (params.generation_mode) setSelectValue(generationModeSelect, params.generation_mode)
+      if (params.reference_image_type) setSelectValue(refImageTypeSelect, params.reference_image_type)
+      if (params.timeout != null) timeoutInput.value = params.timeout
+      if (params.retry_count != null) retryCountInput.value = params.retry_count
+      if (params.retry_error_keywords) retryKeywords.value = params.retry_error_keywords
+      if (params.no_retry_error_keywords) noRetryKeywords.value = params.no_retry_error_keywords
+      updateModelInfo()
+      updateRefImageTypeVisibility()
+    })
+    updateModelInfo()
+    updateRefImageTypeVisibility()
+
+    /* ===== 检查更新流程 ===== */
+    var _pendingUpdate = null
+
+    checkUpdateBtn.addEventListener('click', function () {
+      checkUpdateBtn.disabled = true
+      checkUpdateBtn.textContent = '检查中…'
+      updateResult.className = 'update-result info'
+      updateResult.textContent = '正在获取更新清单…'
+      PluginSDK.sendAction('check_update')
+    })
+
+    PluginSDK.onAction('check_update', function (data) {
+      checkUpdateBtn.disabled = false
+      checkUpdateBtn.textContent = '检查插件更新'
+      if (!data || !data.ok) {
+        updateResult.className = 'update-result error'
+        updateResult.textContent = data ? data.error : '请求失败'
+        return
+      }
+      if (!data.has_update) {
+        updateResult.className = 'update-result success'
+        updateResult.textContent = data.message || '已是最新版本'
+        return
+      }
+      _pendingUpdate = { download_url: data.download_url, sha256: data.sha256 }
+      updateResult.className = 'update-result info'
+      updateResult.innerHTML =
+        '发现新版本: ' + esc(data.local_version) + ' → ' + esc(data.remote_version) +
+        '<br>更新说明: ' + esc(data.changelog) +
+        '<br><button class="confirm-btn" id="confirmUpdateBtn" type="button">立即更新</button>'
+      document.getElementById('confirmUpdateBtn').addEventListener('click', doUpdate)
+    })
+
+    function doUpdate() {
+      if (!_pendingUpdate) return
+      updateResult.className = 'update-result info'
+      updateResult.textContent = '正在下载并安装更新…'
+      PluginSDK.sendAction('do_update', _pendingUpdate)
+      _pendingUpdate = null
+    }
+
+    PluginSDK.onAction('do_update', function (data) {
+      if (!data) return
+      if (data.ok) {
+        updateResult.className = 'update-result success'
+        updateResult.textContent = data.message || '更新成功，请重启应用'
+      } else {
+        updateResult.className = 'update-result error'
+        updateResult.textContent = '更新失败: ' + (data.error || '未知错误')
+      }
+    })
+
+    /* ===== 弹窗按钮 ===== */
+    document.getElementById('btnTaskLog').addEventListener('click', function () {
+      PluginSDK.sendAction('open_task_logs')
+    })
+    document.getElementById('btnLiveLog').addEventListener('click', function () {
+      PluginSDK.sendAction('open_live_logs')
+    })
+
+    function esc(text) {
+      var d = document.createElement('div')
+      d.textContent = text || ''
+      return d.innerHTML
+    }
+  </script>
+</body>
+</html>

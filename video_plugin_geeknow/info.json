@@ -1,0 +1,4 @@
+{
+  "name": "GeekNow 中转插件(推荐)",
+  "description": "通过 GeekNow 中转API 调用 Sora2/Veo3.1 等模型生成视频\n支持音频生成控制、插件自动更新、任务日志管理等功能"
+}

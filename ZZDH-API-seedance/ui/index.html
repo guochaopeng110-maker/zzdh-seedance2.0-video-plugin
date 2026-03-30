@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Seedance 2.0 API 视频生成插件</title>
+  <link rel="stylesheet" href="../../../plugin-sdk.css">
+  <style>
+    .api-key-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .api-key-wrapper input {
+      flex: 1;
+      padding-right: 36px;
+    }
+    .toggle-eye {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+    .toggle-eye:hover {
+      color: var(--text-primary);
+    }
+    .mode-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      line-height: 1.5;
+    }
+    .resolution-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .hint-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <h3>Seedance 2.0 API 视频生成插件</h3>
+  <p class="hint-text">通过 ZZDH-API 调用火山引擎 Seedance 2.0 生成视频。</p>
+  <hr>
+
+  <div class="form-row">
+    <label class="form-label">API Key</label>
+    <div class="form-control">
+      <div class="api-key-wrapper">
+        <input type="password" id="apiKeyInput" placeholder="API Key">
+        <button class="toggle-eye" id="toggleEye" type="button">&#128065;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">生成模式</label>
+    <div class="form-control">
+      <select id="generationModeSelect">
+        <option value="first_end_frame" selected>首尾帧生视频</option>
+        <option value="omni_reference">全能参考</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="mode-info" id="modeInfo"></div>
+
+  <div class="form-row">
+    <label class="form-label">分辨率</label>
+    <div class="form-control">
+      <select id="resolutionSelect">
+        <option value="480p">480p</option>
+        <option value="720p" selected>720p</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">宽高比</label>
+    <div class="form-control">
+      <select id="ratioSelect">
+        <option value="16:9" selected>16:9</option>
+        <option value="4:3">4:3</option>
+        <option value="1:1">1:1</option>
+        <option value="3:4">3:4</option>
+        <option value="9:16">9:16</option>
+        <option value="21:9">21:9</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="resolution-info" id="resolutionInfo"></div>
+
+  <div class="form-row">
+    <label class="form-label">视频时长(秒)</label>
+    <div class="form-control">
+      <select id="durationSelect">
+        <option value="4">4</option>
+        <option value="5" selected>5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12">12</option>
+        <option value="13">13</option>
+        <option value="14">14</option>
+        <option value="15">15</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">生成音频</label>
+    <div class="form-control">
+      <div class="checkbox-row">
+        <input type="checkbox" id="generateAudioCheckbox" checked>
+        <label for="generateAudioCheckbox">启用</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">超时时间(秒)</label>
+    <div class="form-control">
+      <input type="number" id="timeoutInput" min="60" max="36000" step="1" value="10800">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">重试次数</label>
+    <div class="form-control">
+      <input type="number" id="retryCountInput" min="0" max="10" step="1" value="3">
+    </div>
+  </div>
+
+  <p class="hint-text">
+    提示：<br>
+    - 首尾帧生视频：使用首帧（+尾帧）生成视频<br>
+    - 全能参考：使用多张参考图（最多9张）生成视频<br>
+    - 图片将以 Base64 格式上传
+  </p>
+
+  <script src="../../../plugin-sdk.js"></script>
+  <script>
+    var apiKeyInput = document.getElementById('apiKeyInput')
+    var toggleEye = document.getElementById('toggleEye')
+    var generationModeSelect = document.getElementById('generationModeSelect')
+    var modeInfo = document.getElementById('modeInfo')
+    var resolutionSelect = document.getElementById('resolutionSelect')
+    var ratioSelect = document.getElementById('ratioSelect')
+    var resolutionInfo = document.getElementById('resolutionInfo')
+    var durationSelect = document.getElementById('durationSelect')
+    var generateAudioCheckbox = document.getElementById('generateAudioCheckbox')
+    var timeoutInput = document.getElementById('timeoutInput')
+    var retryCountInput = document.getElementById('retryCountInput')
+
+    var MODE_INFO = {
+      'first_end_frame': '首尾帧生视频：使用首帧（+尾帧）生成视频',
+      'omni_reference': '全能参考：使用多张参考图（最多9张）生成视频'
+    }
+
+    var RESOLUTION_RATIO_MAP = {
+      '480p': {
+        '16:9': [864, 496], '4:3': [752, 560], '1:1': [640, 640],
+        '3:4': [560, 752], '9:16': [496, 864], '21:9': [992, 432]
+      },
+      '720p': {
+        '16:9': [1280, 720], '4:3': [1112, 834], '1:1': [960, 960],
+        '3:4': [834, 1112], '9:16': [720, 1280], '21:9': [1470, 630]
+      }
+    }
+
+    toggleEye.addEventListener('click', function () {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text'
+        toggleEye.textContent = '\uD83D\uDE48'
+      } else {
+        apiKeyInput.type = 'password'
+        toggleEye.textContent = '\uD83D\uDC41'
+      }
+    })
+
+    function updateModeInfo() {
+      var mode = generationModeSelect.value
+      modeInfo.textContent = MODE_INFO[mode] ? '说明：' + MODE_INFO[mode] : ''
+    }
+
+    function updateResolutionInfo() {
+      var res = resolutionSelect.value
+      var ratio = ratioSelect.value
+      if (RESOLUTION_RATIO_MAP[res] && RESOLUTION_RATIO_MAP[res][ratio]) {
+        var wh = RESOLUTION_RATIO_MAP[res][ratio]
+        resolutionInfo.textContent = '输出尺寸：' + wh[0] + ' \u00d7 ' + wh[1] + ' 像素'
+      } else {
+        resolutionInfo.textContent = ''
+      }
+    }
+
+    function setSelectValue(selectEl, value) {
+      if (value == null) return
+      var strVal = String(value)
+      for (var i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === strVal) {
+          selectEl.selectedIndex = i
+          return
+        }
+      }
+    }
+
+    apiKeyInput.addEventListener('change', function () {
+      PluginSDK.saveParam('api_key', apiKeyInput.value)
+    })
+    generationModeSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('generation_mode', generationModeSelect.value)
+      updateModeInfo()
+    })
+    resolutionSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('resolution', resolutionSelect.value)
+      updateResolutionInfo()
+    })
+    ratioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('ratio', ratioSelect.value)
+      updateResolutionInfo()
+    })
+    durationSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('duration', parseInt(durationSelect.value) || 5)
+    })
+    generateAudioCheckbox.addEventListener('change', function () {
+      PluginSDK.saveParam('generate_audio', generateAudioCheckbox.checked)
+    })
+    timeoutInput.addEventListener('change', function () {
+      PluginSDK.saveParam('timeout', parseInt(timeoutInput.value) || 10800)
+    })
+    retryCountInput.addEventListener('change', function () {
+      PluginSDK.saveParam('retry_count', parseInt(retryCountInput.value) || 3)
+    })
+
+    PluginSDK.onReady(function (params) {
+      if (params.api_key) apiKeyInput.value = params.api_key
+      if (params.generation_mode) setSelectValue(generationModeSelect, params.generation_mode)
+      if (params.resolution) setSelectValue(resolutionSelect, params.resolution)
+      if (params.ratio) setSelectValue(ratioSelect, params.ratio)
+      if (params.duration != null) setSelectValue(durationSelect, String(params.duration))
+      if (params.generate_audio != null) generateAudioCheckbox.checked = !!params.generate_audio
+      if (params.timeout != null) timeoutInput.value = params.timeout
+      if (params.retry_count != null) retryCountInput.value = params.retry_count
+      updateModeInfo()
+      updateResolutionInfo()
+    })
+
+    updateModeInfo()
+    updateResolutionInfo()
+  </script>
+</body>
+</html>

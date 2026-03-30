@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>ZZDH-API 视频生成插件</title>
+  <link rel="stylesheet" href="../../../plugin-sdk.css">
+  <style>
+    .api-key-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .api-key-wrapper input {
+      flex: 1;
+      padding-right: 36px;
+    }
+
+    .toggle-eye {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    .toggle-eye:hover {
+      color: var(--text-primary);
+    }
+
+    .model-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      line-height: 1.5;
+    }
+
+    .hint-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h3>ZZDH-API 视频生成插件</h3>
+  <p class="hint-text">通过 ZZDH-API 调用视频模型生成视频。</p>
+  <hr>
+
+  <div class="form-row">
+    <label class="form-label">API Key</label>
+    <div class="form-control">
+      <div class="api-key-wrapper">
+        <input type="password" id="apiKeyInput" placeholder="ZZDH-API API Key">
+        <button class="toggle-eye" id="toggleEye" type="button">&#128065;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">API 地址</label>
+    <div class="form-control">
+      <select id="baseUrlSelect">
+        <option value="https://zizidonghua.com" selected>ZZDH-API (https://zizidonghua.com)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">模型</label>
+    <div class="form-control">
+      <select id="modelSelect"></select>
+    </div>
+  </div>
+
+  <div class="model-info" id="modelInfo"></div>
+
+  <div class="form-row" id="generationModeRow">
+    <label class="form-label">生成模式</label>
+    <div class="form-control">
+      <select id="generationModeSelect"></select>
+    </div>
+  </div>
+
+  <div class="form-row" id="audioRow" style="display:none;">
+    <label class="form-label">音频</label>
+    <div class="form-control">
+      <select id="audioSelect"></select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">分辨率</label>
+    <div class="form-control">
+      <select id="resolutionSelect"></select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">宽高比</label>
+    <div class="form-control">
+      <select id="aspectRatioSelect"></select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">视频时长(秒)</label>
+    <div class="form-control">
+      <select id="durationSelect"></select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">超时时间(秒)</label>
+    <div class="form-control">
+      <input type="number" id="timeoutInput" min="60" max="3600" step="1" value="900">
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">重试次数</label>
+    <div class="form-control">
+      <input type="number" id="retryCountInput" min="0" max="10" step="1" value="3">
+    </div>
+  </div>
+
+  <p class="hint-text">
+    说明：<br>
+    - 非 kf2v 模型支持文生视频与图生视频。<br>
+    - `wan2.2-kf2v-flash` 保持首帧生视频与首尾帧生视频。<br>
+    - `可灵 3.0 Omni` 支持 720p/1080p、有声/静音和宽高比。<br>
+    - 可灵最终会由后端自动映射到对应的 8 个调用名称。
+  </p>
+
+  <script src="../../../plugin-sdk.js"></script>
+  <script>
+    var apiKeyInput = document.getElementById('apiKeyInput')
+    var toggleEye = document.getElementById('toggleEye')
+    var baseUrlSelect = document.getElementById('baseUrlSelect')
+    var modelSelect = document.getElementById('modelSelect')
+    var modelInfo = document.getElementById('modelInfo')
+    var generationModeSelect = document.getElementById('generationModeSelect')
+    var audioRow = document.getElementById('audioRow')
+    var audioSelect = document.getElementById('audioSelect')
+    var resolutionSelect = document.getElementById('resolutionSelect')
+    var aspectRatioSelect = document.getElementById('aspectRatioSelect')
+    var durationSelect = document.getElementById('durationSelect')
+    var timeoutInput = document.getElementById('timeoutInput')
+    var retryCountInput = document.getElementById('retryCountInput')
+
+    var DEFAULT_RESOLUTIONS = ['480p', '720p', '1080p']
+    var DEFAULT_ASPECT_RATIOS = ['16:9', '9:16', '4:3', '3:4', '1:1']
+    var KLING_RESOLUTIONS = ['720p', '1080p']
+    var VIDU_Q3_RESOLUTIONS = ['540p', '720p', '1080p']
+    var VIDU_Q3_DURATIONS = ['5', '8', '10', '12', '16']
+    var MODE_TEXT_TO_VIDEO = '文生视频'
+    var MODE_IMAGE_TO_VIDEO = '图生视频'
+    var MODE_FIRST_FRAME = '首帧生视频'
+    var MODE_FIRST_LAST_FRAME = '首尾帧生视频'
+    var AUDIO_DISABLED = 'Disabled'
+    var AUDIO_ENABLED = 'Enabled'
+    var MODEL_ALIASES = {
+      'kling-3.0-omni': 'kling-v3-omni'
+    }
+    var AUDIO_OPTIONS = [
+      { value: AUDIO_DISABLED, label: '静音' },
+      { value: AUDIO_ENABLED, label: '有声' }
+    ]
+
+    function createModelConfig(config) {
+      return Object.assign({
+        generationModes: [MODE_TEXT_TO_VIDEO, MODE_IMAGE_TO_VIDEO],
+        defaultGenerationMode: MODE_IMAGE_TO_VIDEO,
+        durations: ['5', '10', '15'],
+        resolutions: DEFAULT_RESOLUTIONS,
+        aspectRatios: DEFAULT_ASPECT_RATIOS,
+        audioOptions: [],
+        defaultAudioGeneration: AUDIO_DISABLED
+      }, config)
+    }
+
+    var MODEL_CONFIGS = {
+      'wan2.6-i2v': createModelConfig({
+        label: 'wan2.6-i2v（文生/图生视频）',
+        info: '阿里万相 wan2.6，支持文生视频和图生视频。'
+      }),
+      'wan2.6-i2v-flash': createModelConfig({
+        label: 'wan2.6-i2v-flash（文生/图生视频）',
+        info: '阿里万相 wan2.6 Flash，支持文生视频和图生视频。'
+      }),
+      'wan2.2-i2v-plus': createModelConfig({
+        label: 'wan2.2-i2v-plus（文生/图生视频）',
+        info: '阿里万相 wan2.2 Plus，支持文生视频和图生视频。'
+      }),
+      'wan2.2-kf2v-flash': createModelConfig({
+        label: 'wan2.2-kf2v-flash（首帧/首尾帧）',
+        generationModes: [MODE_FIRST_FRAME, MODE_FIRST_LAST_FRAME],
+        defaultGenerationMode: MODE_FIRST_FRAME,
+        durations: ['2', '3', '4', '5'],
+        info: '阿里万相 wan2.2 kf2v Flash，支持首帧生视频和首尾帧生视频。'
+      }),
+      'kling-v3-omni': createModelConfig({
+        label: '可灵 3.0 Omni',
+        durations: ['5', '10'],
+        resolutions: KLING_RESOLUTIONS,
+        audioOptions: AUDIO_OPTIONS,
+        defaultAudioGeneration: AUDIO_DISABLED,
+        info: '可灵 3.0 Omni 支持文生视频和图生视频，后端会根据分辨率、音频和是否有参考图自动选择最终调用名称。'
+      }),
+      'vidu-q3-pro': createModelConfig({
+        label: 'Vidu Q3 Pro',
+        durations: VIDU_Q3_DURATIONS,
+        resolutions: VIDU_Q3_RESOLUTIONS,
+        audioOptions: AUDIO_OPTIONS,
+        defaultAudioGeneration: AUDIO_ENABLED,
+        info: 'Vidu Q3 Pro'
+      }),
+      'vidu-q3-turbo': createModelConfig({
+        label: 'Vidu Q3 Turbo',
+        durations: VIDU_Q3_DURATIONS,
+        resolutions: VIDU_Q3_RESOLUTIONS,
+        audioOptions: AUDIO_OPTIONS,
+        defaultAudioGeneration: AUDIO_ENABLED,
+        info: 'Vidu Q3 Turbo'
+      })
+    }
+
+    function getModelConfig(model) {
+      var normalizedModel = MODEL_ALIASES[model] || model
+      return MODEL_CONFIGS[normalizedModel] || MODEL_CONFIGS['wan2.6-i2v']
+    }
+
+    function renderSelectOptions(selectEl, values, labels) {
+      selectEl.innerHTML = ''
+      for (var i = 0; i < values.length; i++) {
+        var option = document.createElement('option')
+        option.value = values[i]
+        option.textContent = labels ? labels[i] : values[i]
+        selectEl.appendChild(option)
+      }
+    }
+
+    function renderAudioOptions(options) {
+      renderSelectOptions(
+        audioSelect,
+        options.map(function (item) { return item.value }),
+        options.map(function (item) { return item.label })
+      )
+    }
+
+    function normalizeByOptions(value, options, fallbackValue) {
+      return options.indexOf(String(value)) >= 0 ? String(value) : fallbackValue
+    }
+
+    function setSelectValue(selectEl, value) {
+      if (value == null) return
+      var strVal = String(value)
+      for (var i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === strVal) {
+          selectEl.selectedIndex = i
+          return
+        }
+      }
+    }
+
+    function updateModelUI(preferredValues, persistChanges) {
+      var model = modelSelect.value
+      var config = getModelConfig(model)
+      var audioValues = config.audioOptions.map(function (item) { return item.value })
+      modelInfo.textContent = config.info ? ('说明：' + config.info) : ('模型 ID：' + model)
+
+      renderSelectOptions(generationModeSelect, config.generationModes)
+      renderSelectOptions(resolutionSelect, config.resolutions)
+      renderSelectOptions(aspectRatioSelect, config.aspectRatios)
+      renderSelectOptions(durationSelect, config.durations)
+      renderAudioOptions(config.audioOptions)
+
+      var nextGenerationMode = normalizeByOptions(
+        preferredValues && preferredValues.generation_mode != null ? preferredValues.generation_mode : generationModeSelect.value,
+        config.generationModes,
+        config.defaultGenerationMode
+      )
+      var nextResolution = normalizeByOptions(
+        preferredValues && preferredValues.resolution != null ? preferredValues.resolution : resolutionSelect.value,
+        config.resolutions,
+        config.resolutions[0]
+      )
+      var nextAspectRatio = normalizeByOptions(
+        preferredValues && preferredValues.aspect_ratio != null ? preferredValues.aspect_ratio : aspectRatioSelect.value,
+        config.aspectRatios,
+        config.aspectRatios[0]
+      )
+      var nextDuration = normalizeByOptions(
+        preferredValues && preferredValues.duration != null ? preferredValues.duration : durationSelect.value,
+        config.durations,
+        config.durations[0]
+      )
+      var nextAudioGeneration = normalizeByOptions(
+        preferredValues && preferredValues.audio_generation != null ? preferredValues.audio_generation : audioSelect.value,
+        audioValues,
+        config.defaultAudioGeneration
+      )
+
+      generationModeSelect.value = nextGenerationMode
+      resolutionSelect.value = nextResolution
+      aspectRatioSelect.value = nextAspectRatio
+      durationSelect.value = nextDuration
+      audioSelect.value = nextAudioGeneration
+      audioRow.style.display = audioValues.length > 0 ? '' : 'none'
+
+      if (persistChanges) {
+        if (!preferredValues || String(preferredValues.generation_mode) !== nextGenerationMode) {
+          PluginSDK.saveParam('generation_mode', nextGenerationMode)
+        }
+        if (!preferredValues || String(preferredValues.resolution) !== nextResolution) {
+          PluginSDK.saveParam('resolution', nextResolution)
+        }
+        if (!preferredValues || String(preferredValues.aspect_ratio) !== nextAspectRatio) {
+          PluginSDK.saveParam('aspect_ratio', nextAspectRatio)
+        }
+        if (!preferredValues || String(preferredValues.duration) !== nextDuration) {
+          PluginSDK.saveParam('duration', nextDuration)
+        }
+        if (audioValues.length > 0 && (!preferredValues || String(preferredValues.audio_generation) !== nextAudioGeneration)) {
+          PluginSDK.saveParam('audio_generation', nextAudioGeneration)
+        }
+      }
+    }
+
+    toggleEye.addEventListener('click', function () {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text'
+        toggleEye.textContent = '\uD83D\uDE48'
+      } else {
+        apiKeyInput.type = 'password'
+        toggleEye.textContent = '\uD83D\uDC41'
+      }
+    })
+
+    apiKeyInput.addEventListener('change', function () {
+      PluginSDK.saveParam('api_key', apiKeyInput.value)
+    })
+    baseUrlSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('base_url', baseUrlSelect.value)
+    })
+    modelSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('model', modelSelect.value)
+      updateModelUI(null, true)
+    })
+    generationModeSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('generation_mode', generationModeSelect.value)
+    })
+    audioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('audio_generation', audioSelect.value)
+    })
+    resolutionSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('resolution', resolutionSelect.value)
+    })
+    aspectRatioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('aspect_ratio', aspectRatioSelect.value)
+    })
+    durationSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('duration', durationSelect.value)
+    })
+    timeoutInput.addEventListener('change', function () {
+      PluginSDK.saveParam('timeout', parseInt(timeoutInput.value, 10) || 900)
+    })
+    retryCountInput.addEventListener('change', function () {
+      PluginSDK.saveParam('retry_count', parseInt(retryCountInput.value, 10) || 3)
+    })
+
+    PluginSDK.onReady(function (params) {
+      var modelValues = Object.keys(MODEL_CONFIGS)
+      var modelLabels = modelValues.map(function (item) {
+        return item === 'kling-v3-omni' ? 'Kling V3 Omni' : MODEL_CONFIGS[item].label
+      })
+      renderSelectOptions(modelSelect, modelValues, modelLabels)
+
+      if (params.api_key) apiKeyInput.value = params.api_key
+      if (params.base_url) setSelectValue(baseUrlSelect, params.base_url)
+      if (params.model) setSelectValue(modelSelect, MODEL_ALIASES[params.model] || params.model)
+      if (params.timeout != null) timeoutInput.value = params.timeout
+      if (params.retry_count != null) retryCountInput.value = params.retry_count
+
+      updateModelUI(
+        params,
+        params.duration != null ||
+        params.generation_mode != null ||
+        params.aspect_ratio != null ||
+        params.resolution != null ||
+        params.audio_generation != null
+      )
+    })
+
+    renderSelectOptions(
+      modelSelect,
+      Object.keys(MODEL_CONFIGS),
+      Object.keys(MODEL_CONFIGS).map(function (item) {
+        return item === 'kling-v3-omni' ? 'Kling V3 Omni' : MODEL_CONFIGS[item].label
+      })
+    )
+    updateModelUI()
+  </script>
+</body>
+</html>

@@ -1,15 +1,15 @@
-# Project State: video_plugin_zlhub_seedance
+# 项目状态: video_plugin_zlhub_seedance
 
-## Project Reference
+## 项目参考
 
-See: .planning/PROJECT.md (updated 2026-03-30)
+参见: .planning/PROJECT.md (更新于 2026-03-30)
 
-**Core value:** 新增的 zlhub seedance2.0 插件必须在不改宿主程序的前提下，被字字动画稳定加载并完成完整的视频生成主链路。
-**Current focus:** Phase 1 — Foundation
+**核心价值:** 新增的 zlhub seedance2.0 插件必须在不改宿主程序的前提下，被字字动画稳定加载并完成完整的视频生成主链路。
+**当前焦点:** 阶段 1 — 基础构建
 
-## Milestone Progress
+## 里程碑进度
 
-| Phase | Status | Plans | Progress |
+| 阶段 | 状态 | 计划 | 进度 |
 |-------|--------|-------|----------|
 | 1     | ○      | 0/0   | 0%       |
 | 2     | ○      | 0/0   | 0%       |
@@ -17,21 +17,21 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 | 4     | ○      | 0/0   | 0%       |
 | 5     | ○      | 0/0   | 0%       |
 
-**Total Progress:** 0%
+**总体进度:** 0%
 
-## Active Phase: 1 — Foundation
+## 当前激活阶段: 1 — 基础构建
 
-**Goal:** Create plugin shell and host metadata
+**目标:** 创建插件壳和宿主元数据
 
-**Requirements:**
-- [ ] CONT-01: Implement `get_info()`
-- [ ] CONT-02: Implement `get_params()`
-- [ ] CONT-04: Ensure plugin directory structure
+**需求:**
+- [ ] CONT-01: 实现 `get_info()`
+- [ ] CONT-02: 实现 `get_params()`
+- [ ] CONT-04: 确保插件目录结构
 
-**Success Criteria:**
-- [ ] `video_plugin_zlhub_seedance/` directory exists.
-- [ ] `main.py` exists with `get_info()` and `get_params()`.
-- [ ] Host can read plugin info.
+**成功标准:**
+- [ ] `video_plugin_zlhub_seedance/` 目录已存在。
+- [ ] `main.py` 已存在，并包含 `get_info()` 和 `get_params()`。
+- [ ] 宿主可以读取插件信息。
 
 ---
-*Last updated: 2026-03-30*
+*最后更新：2026-03-30*

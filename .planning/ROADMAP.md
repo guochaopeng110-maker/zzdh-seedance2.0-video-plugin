@@ -1,97 +1,97 @@
-# Roadmap: video_plugin_zlhub_seedance
+# 路线图: video_plugin_zlhub_seedance
 
-## Overview
+## 概览
 
-**5 phases** | **17 requirements mapped** | All v1 requirements covered ✓
+**5 个阶段** | **已映射 17 项需求** | 已覆盖所有 v1 需求 ✓
 
-| # | Phase | Goal | Requirements | Success Criteria |
+| # | 阶段 | 目标 | 需求 | 成功标准 |
 |---|-------|------|--------------|------------------|
-| 1 | Foundation | Create plugin shell and host metadata | CONT-01, CONT-02, CONT-04 | 3 |
-| 2 | Parameters | Implement validation and capability mapping | PARA-01, PARA-02, PARA-03 | 3 |
-| 3 | API Client | Build ZLHub Seedance 2.0 integration | API-01, API-02, API-03, API-04 | 4 |
-| 4 | Orchestration | Wire end-to-end task lifecycle (Poll/Download) | ORCH-01, ORCH-02, ORCH-03 | 3 |
-| 5 | UI & Integration | Finalize host callbacks and error handling | ERR-01, ERR-02, ERR-03, CONT-03 | 4 |
+| 1 | 基础构建 | 创建插件壳和宿主元数据 | CONT-01, CONT-02, CONT-04 | 3 |
+| 2 | 参数处理 | 实现校验和能力映射 | PARA-01, PARA-02, PARA-03 | 3 |
+| 3 | API 客户端 | 构建 ZLHub Seedance 2.0 集成 | API-01, API-02, API-03, API-04 | 4 |
+| 4 | 逻辑编排 | 串联端到端任务生命周期 (轮询/下载) | ORCH-01, ORCH-02, ORCH-03 | 3 |
+| 5 | UI 与集成 | 完成宿主回调和错误处理 | ERR-01, ERR-02, ERR-03, CONT-03 | 4 |
 
 ---
 
-## Phase Details
+## 阶段详情
 
-### Phase 1: Foundation
-**Goal:** Create the directory structure and the host-facing entry point metadata so `字字动画.exe` can recognize the plugin.
+### 阶段 1: 基础构建
+**目标:** 创建目录结构和面向宿主的入口点元数据，以便 `字字动画.exe` 能够识别该插件。
 
-**Requirements:**
-- **CONT-01**: `get_info()` metadata.
-- **CONT-02**: `get_params()` UI schema.
-- **CONT-04**: Directory structure.
+**需求:**
+- **CONT-01**: `get_info()` 元数据。
+- **CONT-02**: `get_params()` UI 模式。
+- **CONT-04**: 目录结构。
 
-**Success Criteria:**
-1. `video_plugin_zlhub_seedance/` directory exists.
-2. `main.py` exists with `get_info()` and `get_params()`.
-3. Host (simulated/mocked) can read plugin info.
-
----
-
-### Phase 2: Parameters
-**Goal:** Implement the logic to sanitize, validate, and normalize host inputs into Seedance-specific constraints.
-
-**Requirements:**
-- **PARA-01**: Resolution/Ratio mapping.
-- **PARA-02**: Duration/Audio settings.
-- **PARA-03**: Image physical validation.
-
-**Success Criteria:**
-1. Invalid aspect ratios or resolutions are rejected/clamped.
-2. Image size/format checks pass for valid files and fail for invalid ones.
-3. Parameter objects are correctly transformed for API consumption.
+**成功标准:**
+1. `video_plugin_zlhub_seedance/` 目录已存在。
+2. `main.py` 已存在，并包含 `get_info()` 和 `get_params()`。
+3. 宿主（模拟/Mock）可以读取插件信息。
 
 ---
 
-### Phase 3: API Client
-**Goal:** Implement the core network logic for talking to ZLHub.
+### 阶段 2: 参数处理
+**目标:** 实现将宿主输入清洗、校验并规范化为 Seedance 特定约束的逻辑。
 
-**Requirements:**
-- **API-01**: Auth headers.
-- **API-02**: Create Task payload.
-- **API-03**: Query Task status.
-- **API-04**: Download logic.
+**需求:**
+- **PARA-01**: 分辨率/宽高比映射。
+- **PARA-02**: 时长/音频设置。
+- **PARA-03**: 图像物理约束校验。
 
-**Success Criteria:**
-1. Successful authentication with ZLHub.
-2. `Task ID` received upon creation.
-3. Polling returns `running` or `completed` states.
-4. Video file is successfully downloaded to disk.
+**成功标准:**
+1. 无效的宽高比或分辨率被拒绝/限制在有效范围内。
+2. 图像大小/格式检查对有效文件通过，对无效文件失败。
+3. 参数对象被正确转换以供 API 调用。
 
 ---
 
-### Phase 4: Orchestration
-**Goal:** Combine the client and parameters into a robust state machine for task execution.
+### 阶段 3: API 客户端
+**目标:** 实现与 ZLHub 通信的核心网络逻辑。
 
-**Requirements:**
-- **ORCH-01**: End-to-end workflow logic.
-- **ORCH-02**: Polling strategy (intervals/timeouts).
-- **ORCH-03**: Terminal state mapping.
+**需求:**
+- **API-01**: 身份验证请求头。
+- **API-02**: 创建任务的 Payload。
+- **API-03**: 查询任务状态。
+- **API-04**: 下载逻辑。
 
-**Success Criteria:**
-1. A single call to the orchestrator completes the full lifecycle.
-2. Polling respects timeouts and stops on failure.
-3. The plugin doesn't hang indefinitely.
+**成功标准:**
+1. 成功通过 ZLHub 身份验证。
+2. 创建任务后收到 `Task ID`。
+3. 轮询返回 `running` 或 `completed` 状态。
+4. 视频文件成功下载到磁盘。
+
+---
+
+### 阶段 4: 逻辑编排
+**目标:** 将客户端和参数逻辑组合成一个健壮的任务执行状态机。
+
+**需求:**
+- **ORCH-01**: 端到端工作流逻辑。
+- **ORCH-02**: 轮询策略（间隔/超时）。
+- **ORCH-03**: 终端状态映射。
+
+**成功标准:**
+1. 对编排器的单次调用即可完成完整生命周期。
+2. 轮询遵循超时设置并在失败时停止。
+3. 插件不会无限期挂起。
 
 ---
 
-### Phase 5: UI & Integration
-**Goal:** Finalize the connection to the host via callbacks and standardized error reporting.
+### 阶段 5: UI 与集成
+**目标:** 通过回调和标准化的错误报告完成与宿主的连接。
 
-**Requirements:**
-- **ERR-01**: Unified error prefixes.
-- **ERR-02**: Progress callbacks.
-- **ERR-03**: Lifecycle logging.
-- **CONT-03**: `generate()` implementation.
+**需求:**
+- **ERR-01**: 统一的错误前缀。
+- **ERR-02**: 进度回调。
+- **ERR-03**: 生命周期日志记录。
+- **CONT-03**: `generate()` 实现。
 
-**Success Criteria:**
-1. User-facing errors start with `PLUGIN_ERROR:::`.
-2. Host receives percentage/status updates during the process.
-3. Logs capture enough detail to debug a failed task.
-4. `main.py:generate()` successfully triggers the full orchestrator.
+**成功标准:**
+1. 面向用户的错误以 `PLUGIN_ERROR:::` 开头。
+2. 宿主在过程中收到进度百分比/状态更新。
+3. 日志捕获了足够的细节来调试失败的任务。
+4. `main.py:generate()` 成功触发完整的编排器。
 
 ---
-*Last updated: 2026-03-30*
+*最后更新：2026-03-30*

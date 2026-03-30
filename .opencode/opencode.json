@@ -1,0 +1,10 @@
+{
+  "permission": {
+    "read": {
+      "F:/Projects/zz-video-plugins/.opencode/get-shit-done/*": "allow"
+    },
+    "external_directory": {
+      "F:/Projects/zz-video-plugins/.opencode/get-shit-done/*": "allow"
+    }
+  }
+}
