@@ -7,7 +7,9 @@
       "Bash(git:*)",
       "WebFetch",
       "mcp__acp__Write",
-      "mcp__acp__Edit"
+      "mcp__acp__Edit",
+      "Skill(gsd:quick)",
+      "Skill(gsd:quick:*)"
     ]
   },
   "hooks": {
