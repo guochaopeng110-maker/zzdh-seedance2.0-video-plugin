@@ -94,17 +94,114 @@
   * `Content-Type`: `application/json`
   * `Authorization`: `Bearer $ARK_API_KEY`
 
-### 3.2 响应参数片段 (Response Fields Extract)
-以下是此指定款模型返回的关键字段说明：
+### 3.2 响应参数说明 (Response Fields)
+以下是接口返回的主要字段说明：
 
 | 字段路径 | 类型 | 描述 |
 | :--- | :--- | :--- |
-| `tools` | `object[]` | 模型实际调用的工具配置（如 `[{"type": "web_search"}]`）。 |
+| `id` | `string` | 任务唯一标识 ID。 |
+| `status` | `string` | 任务状态：`running` (运行中), `succeeded` (成功), `failed` (失败)。 |
+| `content.video_url` | `string` | 生成的视频下载链接（仅在成功时返回）。 |
+| `usage` | `object` | 资源消耗信息，包含 `completion_tokens` 和 `total_tokens`。 |
+| `proxy_meta.cost` | `object` | 计费详情，包含人民币 (CNY) 和美元 (USD) 的明细。 |
+| `created_at` | `integer` | 任务创建的时间戳（Unix Timestamp）。 |
+| `updated_at` | `integer` | 任务最后更新的时间戳。 |
+
+cost字段说明:
 | `usage` | `object` | 本次请求的 Token 消耗信息。 |
 | `usage.completion_tokens` | `integer` | 模型输出视频花费的 Token 数量。 |
 | `usage.total_tokens` | `integer` | 本次请求消耗的总 Token 数量。 |
 | `usage.tool_usage` | `object` | 工具使用统计信息。 |
-| `usage.tool_usage.web_search` | `integer` | 实际调用联网搜索的次数（开启 `web_search` 且被触发时返回，`0` 表示未搜索）。 |
+| `usage.tool_usage.web_search` | `integer` | 实际调用联网搜索的次数（开启 `web_search` 且
+
+### 3.3 响应示例 (Response Examples)
+
+#### 3.3.1 任务运行中 (Running)
+```json
+{
+    "id": "cgt-20260330182029-2b92b",
+    "model": "doubao-seedance-2-0-260128",
+    "status": "running",
+    "created_at": 1774866048,
+    "updated_at": 1774866496,
+    "execution_expires_after": 172800,
+    "draft": false
+}
+```
+
+#### 3.3.2 任务完成后 (Succeeded)
+```json
+{
+    "id": "cgt-20260330182029-2b92b",
+    "model": "doubao-seedance-2-0-260128",
+    "status": "succeeded",
+    "content": {
+        "video_url": "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-2-0/02177486615467600000000000000000000ffffac15ae905dd4dc.mp4?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=AKLTYWJkZTExNjA1ZDUyNDc3YzhjNTM5OGIyNjBhNDcyOTQ%2F20260330%2Fcn-beijing%2Ftos%2Frequest&X-Tos-Date=20260330T102757Z&X-Tos-Expires=86400&X-Tos-Signature=b28ab314c5c97e78a718e0c9bd8275bdc14448fcb6e5d27004ad1190424b7f09&X-Tos-SignedHeaders=host"
+    },
+    "usage": {
+        "completion_tokens": 411300,
+        "total_tokens": 411300
+    },
+    "created_at": 1774866048,
+    "updated_at": 1774866496,
+    "seed": 70242,
+    "resolution": "720p",
+    "ratio": "16:9",
+    "duration": 11,
+    "framespersecond": 24,
+    "service_tier": "default",
+    "execution_expires_after": 172800,
+    "generate_audio": true,
+    "draft": false,
+    "proxy_meta": {
+        "usage": {
+            "input_tokens": 0,
+            "output_tokens": 411300,
+            "total_tokens": 411300,
+            "max_output_tokens": 411300
+        },
+        "cost": {
+            "currency": "CNY",
+            "input_cost": "0.0000000000",
+            "output_cost": "11.5164000000",
+            "total_cost": "11.5164000000",
+            "pricing_strategy": "avg",
+            "cny": {
+                "currency": "CNY",
+                "input_cost": "0.0000000000",
+                "output_cost": "11.5164000000",
+                "total_cost": "11.5164000000",
+                "pricing_strategy": "avg"
+            },
+            "usd": {
+                "currency": "USD",
+                "input_cost": "0.0000000000",
+                "output_cost": "1.6642196636",
+                "total_cost": "1.6642196636",
+                "pricing_strategy": "avg"
+            }
+        },
+        "costs": {
+            "CNY": {
+                "currency": "CNY",
+                "input_cost": "0.0000000000",
+                "output_cost": "11.5164000000",
+                "total_cost": "11.5164000000",
+                "pricing_strategy": "avg"
+            },
+            "USD": {
+                "currency": "USD",
+                "input_cost": "0.0000000000",
+                "output_cost": "1.6642196636",
+                "total_cost": "1.6642196636",
+                "pricing_strategy": "avg"
+            }
+        },
+        "is_stream": false,
+        "zhonglian_maas": true
+    }
+}
+```
 
 ---
 

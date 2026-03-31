@@ -6,10 +6,8 @@
       "Bash(node:*)",
       "Bash(git:*)",
       "WebFetch",
-      "mcp__acp__Write",
-      "mcp__acp__Edit",
-      "Skill(gsd:quick)",
-      "Skill(gsd:quick:*)"
+      "Bash(command:*)",
+      "Bash(curl:*)"
     ]
   },
   "hooks": {
