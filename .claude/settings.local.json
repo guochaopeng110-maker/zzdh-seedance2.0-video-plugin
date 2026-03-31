@@ -1,12 +1,53 @@
 {
+  "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Skill(gsd:new-project)",
-      "Skill(gsd:new-project:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "WebFetch",
       "mcp__acp__Write",
-      "Skill(gsd:discuss-phase)",
-      "Skill(gsd:discuss-phase:*)",
       "mcp__acp__Edit"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-check-update.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-context-monitor.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-prompt-guard.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node .claude/hooks/gsd-statusline.js"
   }
 }
