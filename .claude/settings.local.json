@@ -3,7 +3,10 @@
     "allow": [
       "Skill(gsd:new-project)",
       "Skill(gsd:new-project:*)",
-      "mcp__acp__Write"
+      "mcp__acp__Write",
+      "Skill(gsd:discuss-phase)",
+      "Skill(gsd:discuss-phase:*)",
+      "mcp__acp__Edit"
     ]
   }
 }

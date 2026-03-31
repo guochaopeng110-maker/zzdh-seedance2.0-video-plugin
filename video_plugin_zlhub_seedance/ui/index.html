@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>ZLHub Seedance 视频生成插件</title>
+  <link rel="stylesheet" href="../../../plugin-sdk.css">
+  <style>
+    .api-key-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .api-key-wrapper input {
+      flex: 1;
+      padding-right: 36px;
+    }
+
+    .toggle-eye {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    .toggle-eye:hover {
+      color: var(--text-primary);
+    }
+
+    .model-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      line-height: 1.5;
+    }
+
+    .hint-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h3>ZLHub Seedance 视频生成插件</h3>
+  <p class="hint-text">通过 ZLHub 中转平台调用 Seedance 2.0 模型生成视频。</p>
+  <hr>
+
+  <div class="form-row">
+    <label class="form-label">API Key</label>
+    <div class="form-control">
+      <div class="api-key-wrapper">
+        <input type="password" id="apiKeyInput" placeholder="ZLHub API Key">
+        <button class="toggle-eye" id="toggleEye" type="button">&#128065;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">API 地址</label>
+    <div class="form-control">
+      <select id="baseUrlSelect">
+        <option value="https://api.zlhub.com" selected>ZLHub (https://api.zlhub.com)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">模型</label>
+    <div class="form-control">
+      <select id="modelSelect">
+        <option value="seedance-2.0">Seedance 2.0</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">分辨率</label>
+    <div class="form-control">
+      <select id="resolutionSelect">
+        <option value="720p">720p</option>
+        <option value="480p">480p</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">宽高比</label>
+    <div class="form-control">
+      <select id="aspectRatioSelect">
+        <option value="16:9">16:9 (横屏)</option>
+        <option value="9:16">9:16 (竖屏)</option>
+        <option value="4:3">4:3</option>
+        <option value="3:4">3:4</option>
+        <option value="1:1">1:1 (正方形)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">视频时长(秒)</label>
+    <div class="form-control">
+      <select id="durationSelect">
+        <option value="5">5秒</option>
+        <option value="10">10秒</option>
+        <option value="15">15秒</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">超时时间(秒)</label>
+    <div class="form-control">
+      <input type="number" id="timeoutInput" min="60" max="3600" step="1" value="900">
+    </div>
+  </div>
+
+  <div class="hint-text">
+    注意：Seedance 2.0 具有严格的图像约束，请确保参考图大小不超过 30MB。
+  </div>
+
+  <script src="../../../plugin-sdk.js"></script>
+  <script>
+    // 基础 UI 交互逻辑
+    var apiKeyInput = document.getElementById('apiKeyInput');
+    var toggleEye = document.getElementById('toggleEye');
+    var resolutionSelect = document.getElementById('resolutionSelect');
+    var aspectRatioSelect = document.getElementById('aspectRatioSelect');
+    var durationSelect = document.getElementById('durationSelect');
+    var timeoutInput = document.getElementById('timeoutInput');
+
+    toggleEye.addEventListener('click', function () {
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+        toggleEye.textContent = '\uD83D\uDE48'; // 🙈
+      } else {
+        apiKeyInput.type = 'password';
+        toggleEye.textContent = '\uD83D\uDC41'; // 👁
+      }
+    });
+
+    apiKeyInput.addEventListener('change', function () {
+      PluginSDK.saveParam('api_key', apiKeyInput.value);
+    });
+
+    resolutionSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('resolution', resolutionSelect.value);
+    });
+
+    aspectRatioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('aspect_ratio', aspectRatioSelect.value);
+    });
+
+    durationSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('duration', durationSelect.value);
+    });
+
+    timeoutInput.addEventListener('change', function () {
+      PluginSDK.saveParam('timeout', parseInt(timeoutInput.value, 10) || 900);
+    });
+
+    // 初始化加载
+    PluginSDK.onReady(function (params) {
+      if (params.api_key) apiKeyInput.value = params.api_key;
+      if (params.resolution) resolutionSelect.value = params.resolution;
+      if (params.aspect_ratio) aspectRatioSelect.value = params.aspect_ratio;
+      if (params.duration) durationSelect.value = params.duration;
+      if (params.timeout) timeoutInput.value = params.timeout;
+    });
+  </script>
+</body>
+</html>
