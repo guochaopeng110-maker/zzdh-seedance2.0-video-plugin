@@ -6,7 +6,7 @@
 
 | # | 阶段 | 目标 | 需求 | 成功标准 |
 |---|-------|------|--------------|------------------|
-| 1 | 基础构建 | 创建插件壳和宿主元数据 | CONT-01, CONT-02, CONT-04 | ✓ |
+| 1 | 基础构建 | 创建插件壳、UI 配置页和入口元数据 | CONT-01, CONT-02, CONT-04, CONT-05 | ✓ |
 | 2 | 参数处理 | 实现校验和能力映射 | PARA-01, PARA-02, PARA-03 | 3 |
 | 3 | API 客户端 | 构建 ZLHub Seedance 2.0 集成 | API-01, API-02, API-03, API-04 | 4 |
 | 4 | 逻辑编排 | 串联端到端任务生命周期 (轮询/下载) | ORCH-01, ORCH-02, ORCH-03 | 3 |
@@ -21,13 +21,14 @@
 
 **需求:**
 - **CONT-01**: `get_info()` 元数据。
-- **CONT-02**: `get_params()` UI 模式。
+- **CONT-02**: `get_params()` 逻辑。
 - **CONT-04**: 目录结构。
+- **CONT-05**: `ui/index.html` 配置界面。
 
 **成功标准:**
-1. `video_plugin_zlhub_seedance/` 目录已存在。
+1. `video_plugin_zlhub_seedance/` 目录及 `ui/` 子目录已存在。
 2. `main.py` 已存在，并包含 `get_info()` 和 `get_params()`。
-3. 宿主（模拟/Mock）可以读取插件信息。
+3. `index.html` 已存在，且参数映射符合 Seedance 2.0 接口要求。
 
 ---
 

@@ -6,7 +6,8 @@
 ## Accomplishments
 - **CONT-04**: 成功创建插件目录 `video_plugin_zlhub_seedance/`。
 - **CONT-01**: 在 `main.py` 中实现了 `get_info()` 函数，返回包含插件名称、版本和作者的元数据。
-- **CONT-02**: 在 `main.py` 中实现了 `get_params()` 函数，定义了 API Key、Base URL 以及模型的基础配置参数。
+- **CONT-02**: 在 `main.py` 中实现了 `get_params()` 函数，定义了 API Key、Base URL 以及模型的基础配置参数（音频开关、比例、时长等）。
+- **CONT-05**: 编写了 `ui/index.html`，完全匹配 Seedance 2.0 API 要求的 `ratio` (含 adaptive), `generate_audio`, `duration` 等字段。
 - **模式验证**: 验证了插件的基础导入和元数据读取逻辑。
 
 ## Key Files Created

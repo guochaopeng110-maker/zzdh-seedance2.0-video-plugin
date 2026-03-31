@@ -32,24 +32,21 @@
       color: var(--text-primary);
     }
 
-    .model-info {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 2px;
-      line-height: 1.5;
-    }
-
     .hint-text {
       font-size: 11px;
       color: var(--text-muted);
       margin-top: 8px;
       line-height: 1.5;
     }
+
+    .form-row {
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
   <h3>ZLHub Seedance 视频生成插件</h3>
-  <p class="hint-text">通过 ZLHub 中转平台调用 Seedance 2.0 模型生成视频。</p>
+  <p class="hint-text">对接 ZLHub 中转平台，使用 Seedance 2.0 模型生成视频。</p>
   <hr>
 
   <div class="form-row">
@@ -66,16 +63,7 @@
     <label class="form-label">API 地址</label>
     <div class="form-control">
       <select id="baseUrlSelect">
-        <option value="https://api.zlhub.com" selected>ZLHub (https://api.zlhub.com)</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="form-row">
-    <label class="form-label">模型</label>
-    <div class="form-control">
-      <select id="modelSelect">
-        <option value="seedance-2.0">Seedance 2.0</option>
+        <option value="https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks" selected>ZLHub 标准 (Default)</option>
       </select>
     </div>
   </div>
@@ -84,32 +72,58 @@
     <label class="form-label">分辨率</label>
     <div class="form-control">
       <select id="resolutionSelect">
-        <option value="720p">720p</option>
+        <option value="720p">720p (默认)</option>
         <option value="480p">480p</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">宽高比</label>
+    <label class="form-label">宽高比 (Ratio)</label>
     <div class="form-control">
-      <select id="aspectRatioSelect">
+      <select id="ratioSelect">
+        <option value="adaptive">adaptive (自动适配)</option>
         <option value="16:9">16:9 (横屏)</option>
         <option value="9:16">9:16 (竖屏)</option>
         <option value="4:3">4:3</option>
         <option value="3:4">3:4</option>
         <option value="1:1">1:1 (正方形)</option>
+        <option value="21:9">21:9</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">视频时长(秒)</label>
+    <label class="form-label">视频时长 (Duration)</label>
     <div class="form-control">
       <select id="durationSelect">
-        <option value="5">5秒</option>
+        <option value="5">5秒 (默认)</option>
+        <option value="-1">模型决定 (-1)</option>
+        <option value="4">4秒</option>
+        <option value="8">8秒</option>
         <option value="10">10秒</option>
+        <option value="12">12秒</option>
         <option value="15">15秒</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">生成音频</label>
+    <div class="form-control">
+      <select id="generateAudioSelect">
+        <option value="true">开启 (默认)</option>
+        <option value="false">关闭 (无声)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">联网搜索 (Web Search)</label>
+    <div class="form-control">
+      <select id="webSearchSelect">
+        <option value="false">禁用 (默认)</option>
+        <option value="true">启用</option>
       </select>
     </div>
   </div>
@@ -122,26 +136,29 @@
   </div>
 
   <div class="hint-text">
-    注意：Seedance 2.0 具有严格的图像约束，请确保参考图大小不超过 30MB。
+    <strong>Seedance 2.0 约束提示：</strong><br>
+    - 图片大小需小于 30MB。<br>
+    - 文本建议：中文 ≤ 500字，英文 ≤ 1000词。
   </div>
 
   <script src="../../../plugin-sdk.js"></script>
   <script>
-    // 基础 UI 交互逻辑
     var apiKeyInput = document.getElementById('apiKeyInput');
     var toggleEye = document.getElementById('toggleEye');
     var resolutionSelect = document.getElementById('resolutionSelect');
-    var aspectRatioSelect = document.getElementById('aspectRatioSelect');
+    var ratioSelect = document.getElementById('ratioSelect');
     var durationSelect = document.getElementById('durationSelect');
+    var generateAudioSelect = document.getElementById('generateAudioSelect');
+    var webSearchSelect = document.getElementById('webSearchSelect');
     var timeoutInput = document.getElementById('timeoutInput');
 
     toggleEye.addEventListener('click', function () {
       if (apiKeyInput.type === 'password') {
         apiKeyInput.type = 'text';
-        toggleEye.textContent = '\uD83D\uDE48'; // 🙈
+        toggleEye.textContent = '\uD83D\uDE48';
       } else {
         apiKeyInput.type = 'password';
-        toggleEye.textContent = '\uD83D\uDC41'; // 👁
+        toggleEye.textContent = '\uD83D\uDC41';
       }
     });
 
@@ -153,24 +170,33 @@
       PluginSDK.saveParam('resolution', resolutionSelect.value);
     });
 
-    aspectRatioSelect.addEventListener('change', function () {
-      PluginSDK.saveParam('aspect_ratio', aspectRatioSelect.value);
+    ratioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('ratio', ratioSelect.value);
     });
 
     durationSelect.addEventListener('change', function () {
-      PluginSDK.saveParam('duration', durationSelect.value);
+      PluginSDK.saveParam('duration', parseInt(durationSelect.value));
+    });
+
+    generateAudioSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('generate_audio', generateAudioSelect.value === 'true');
+    });
+
+    webSearchSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('web_search', webSearchSelect.value === 'true');
     });
 
     timeoutInput.addEventListener('change', function () {
       PluginSDK.saveParam('timeout', parseInt(timeoutInput.value, 10) || 900);
     });
 
-    // 初始化加载
     PluginSDK.onReady(function (params) {
       if (params.api_key) apiKeyInput.value = params.api_key;
       if (params.resolution) resolutionSelect.value = params.resolution;
-      if (params.aspect_ratio) aspectRatioSelect.value = params.aspect_ratio;
-      if (params.duration) durationSelect.value = params.duration;
+      if (params.ratio) ratioSelect.value = params.ratio;
+      if (params.duration != null) durationSelect.value = String(params.duration);
+      if (params.generate_audio != null) generateAudioSelect.value = String(params.generate_audio);
+      if (params.web_search != null) webSearchSelect.value = String(params.web_search);
       if (params.timeout) timeoutInput.value = params.timeout;
     });
   </script>

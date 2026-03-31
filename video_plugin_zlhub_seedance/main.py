@@ -11,11 +11,10 @@ import time
 import requests
 from datetime import datetime
 
-# 导入插件工具类（假设在项目根目录或已在 sys.path 中）
+# 导入插件工具类
 try:
     from plugin_utils import load_plugin_config, save_plugin_config
 except ImportError:
-    # 兼容性处理，如果无法导入则定义空实现
     def load_plugin_config(path): return {}
     def save_plugin_config(path, config): pass
 
@@ -23,15 +22,12 @@ _PLUGIN_FILE = __file__
 
 # 配置选项
 _BASE_URL_OPTIONS = [
-    ("ZLHub", "https://api.zlhub.com"),
+    ("ZLHub", "https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks"),
 ]
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
 
 DEFAULT_RESOLUTIONS = ["480p", "720p"]
-DEFAULT_ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4", "1:1"]
-
-AUDIO_ENABLED = "Enabled"
-AUDIO_DISABLED = "Disabled"
+DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
 
 DEFAULT_MODEL = "seedance-2.0"
 
@@ -45,16 +41,16 @@ def get_info():
     }
 
 def _build_default_params():
-    """构建默认参数"""
+    """构建默认参数，与 API 文档及 UI 保持一致"""
     return {
         "api_key": "",
         "base_url": _DEFAULT_BASE_URL,
         "model": DEFAULT_MODEL,
         "resolution": "720p",
-        "aspect_ratio": "16:9",
-        "duration": "5",
-        "generation_mode": "图生视频",
-        "audio_generation": AUDIO_DISABLED,
+        "ratio": "adaptive",
+        "duration": 5,
+        "generate_audio": True,
+        "web_search": False,
         "timeout": 900,
         "max_poll_attempts": 300,
         "poll_interval": 5,
@@ -68,7 +64,20 @@ def _sanitize_params(raw_params=None):
     raw_params = raw_params or {}
     params = _default_params.copy()
     params.update(raw_params)
-    # 此处在后续阶段将实现更详细的校验逻辑 (PARA-01, PARA-02)
+    
+    # 基础类型确保
+    if not isinstance(params["duration"], int):
+        try:
+            params["duration"] = int(params["duration"])
+        except:
+            params["duration"] = 5
+            
+    if not isinstance(params["generate_audio"], bool):
+        params["generate_audio"] = str(params["generate_audio"]).lower() == 'true'
+        
+    if not isinstance(params["web_search"], bool):
+        params["web_search"] = str(params["web_search"]).lower() == 'true'
+        
     return params
 
 def get_params():
@@ -76,7 +85,7 @@ def get_params():
     raw_params = load_plugin_config(_PLUGIN_FILE) or {}
     params = _sanitize_params(raw_params)
     
-    # 如果参数有变化或有缺失，持久化一份
+    # 如果参数有变化（比如新增了字段），持久化一份
     if raw_params != params:
         save_plugin_config(_PLUGIN_FILE, params)
         
