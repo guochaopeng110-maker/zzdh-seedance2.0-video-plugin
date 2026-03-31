@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-31T07:56:30.087Z"
+progress:
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+---
+
 # 项目状态: video_plugin_zlhub_seedance
 
 ## 项目参考
@@ -24,11 +37,13 @@
 **目标:** 创建插件壳和宿主元数据
 
 **需求:**
+
 - [ ] CONT-01: 实现 `get_info()`
 - [ ] CONT-02: 实现 `get_params()`
 - [ ] CONT-04: 确保插件目录结构
 
 **成功标准:**
+
 - [ ] `video_plugin_zlhub_seedance/` 目录已存在。
 - [ ] `main.py` 已存在，并包含 `get_info()` 和 `get_params()`。
 - [ ] 宿主可以读取插件信息。
