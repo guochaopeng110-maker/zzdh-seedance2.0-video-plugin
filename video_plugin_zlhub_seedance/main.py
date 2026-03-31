@@ -4,12 +4,7 @@ ZLHub Seedance 2.0 视频生成插件。
 对接 ZLHub 中转平台，支持 Seedance 2.0 视频大模型。
 """
 
-import json
 import os
-import sys
-import time
-import requests
-from datetime import datetime
 
 # 导入插件工具类
 try:
@@ -22,12 +17,20 @@ except ImportError:
         return None
 
 
+PLUGIN_ERROR_PREFIX = "PLUGIN_ERROR:::"
+
+
 class PluginFatalError(Exception):
     """插件致命错误，宿主应直接提示用户并终止流程。"""
 
+    def __init__(self, message):
+        text = str(message)
+        if not text.startswith(PLUGIN_ERROR_PREFIX):
+            text = f"{PLUGIN_ERROR_PREFIX}{text}"
+        super().__init__(text)
+
 
 _PLUGIN_FILE = __file__
-PLUGIN_ERROR_PREFIX = "PLUGIN_ERROR:::"
 
 # 配置选项
 _BASE_URL_OPTIONS = [
@@ -43,6 +46,9 @@ DEFAULT_GENERATE_AUDIO = True
 
 DEFAULT_RESOLUTIONS = ["480p", "720p"]
 DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
+
+SUPPORTED_IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp", ".bmp", ".tiff", ".gif"}
+MAX_IMAGE_SIZE_BYTES = 30 * 1024 * 1024
 
 RESOLUTION_RATIO_MAP = {
     "480p": {
@@ -95,24 +101,100 @@ def _build_default_params():
 _default_params = _build_default_params()
 
 
+def _normalize_resolution(value):
+    resolution = str(value or "").strip().lower()
+    if resolution in DEFAULT_RESOLUTIONS:
+        return resolution
+    return DEFAULT_RESOLUTION
+
+
+def _normalize_aspect_ratio(value):
+    ratio = str(value or "").strip()
+    if ratio in DEFAULT_RATIOS:
+        return ratio
+    return DEFAULT_RATIO
+
+
+def _normalize_duration(value):
+    try:
+        duration = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_DURATION
+
+    if duration == -1:
+        return -1
+    if duration < 4:
+        return 4
+    if duration > 15:
+        return 15
+    return duration
+
+
+def _normalize_audio_generation(value):
+    if isinstance(value, bool):
+        return value
+
+    text = str(value or "").strip().lower()
+    if text in {"true", "1", "on", "yes", "enabled", "有声"}:
+        return True
+    if text in {"false", "0", "off", "no", "disabled", "无声"}:
+        return False
+    return DEFAULT_GENERATE_AUDIO
+
+
+def _normalize_web_search(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"true", "1", "on", "yes", "enabled"}
+
+
+def _get_physical_pixels(resolution, ratio):
+    if ratio == "adaptive":
+        return None, None
+    pair = RESOLUTION_RATIO_MAP.get(resolution, {}).get(ratio)
+    if not pair:
+        return None, None
+    return pair[0], pair[1]
+
+
+def _validate_image_constraints(image_path):
+    if not image_path:
+        return
+
+    path_text = str(image_path)
+    if path_text.startswith(("http://", "https://", "data:", "asset://")):
+        return
+
+    if not os.path.exists(path_text):
+        raise PluginFatalError(f"参考图片不存在: {path_text}")
+
+    ext = os.path.splitext(path_text)[1].lower()
+    if ext not in SUPPORTED_IMAGE_EXTENSIONS:
+        allowed = ", ".join(sorted(SUPPORTED_IMAGE_EXTENSIONS))
+        raise PluginFatalError(f"图片格式不支持: {ext or 'unknown'}，支持格式: {allowed}")
+
+    size_bytes = os.path.getsize(path_text)
+    if size_bytes >= MAX_IMAGE_SIZE_BYTES:
+        raise PluginFatalError("图片大小超过 30MB 限制")
+
+
 def _sanitize_params(raw_params=None):
     """清洗并规范化参数"""
     raw_params = raw_params or {}
     params = _default_params.copy()
     params.update(raw_params)
 
-    # 基础类型确保
-    if not isinstance(params["duration"], int):
-        try:
-            params["duration"] = int(params["duration"])
-        except Exception:
-            params["duration"] = 5
+    params["resolution"] = _normalize_resolution(params.get("resolution"))
+    params["ratio"] = _normalize_aspect_ratio(params.get("ratio"))
+    params["duration"] = _normalize_duration(params.get("duration"))
+    params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
+    params["web_search"] = _normalize_web_search(params.get("web_search"))
 
-    if not isinstance(params["generate_audio"], bool):
-        params["generate_audio"] = str(params["generate_audio"]).lower() == "true"
+    pixel_width, pixel_height = _get_physical_pixels(params["resolution"], params["ratio"])
+    params["pixel_width"] = pixel_width
+    params["pixel_height"] = pixel_height
 
-    if not isinstance(params["web_search"], bool):
-        params["web_search"] = str(params["web_search"]).lower() == "true"
+    _validate_image_constraints(params.get("image_path"))
 
     return params
 
@@ -122,7 +204,7 @@ def get_params():
     raw_params = load_plugin_config(_PLUGIN_FILE) or {}
     params = _sanitize_params(raw_params)
 
-    # 如果参数有变化（比如新增了字段），持久化一份
+    # 如果参数有变化（比如新增了字段或值被规范化），持久化一份
     if raw_params != params:
         save_plugin_config(_PLUGIN_FILE, params)
 
