@@ -1,0 +1,62 @@
+1775110267.104581814:11:07 - [Geeknow Plugin] 任务日志数据库已就绪: D:\DramaSoft\字字动画_8_0_25\_internal\plugins\video_plugins\video_plugin_geeknow\video_task_logs.db
+1775110267.10659514:11:07 - [Geeknow Plugin] 未找到 seedance 目录，跳过本地服务启动
+1775110687.37277414:18:07 -
+============================================================
+1775110687.37277414:18:07 - [Geeknow Plugin] 开始生成视频
+1775110687.37277414:18:07 - ============================================================
+1775110687.37277414:18:07 - 提示词: 图1是角色江稚鱼，图2是角色江素兰，图3是角色萧思远，图4是场景皇家秋猎空地，图5是物品御赐玉佩 , 0–10秒：镜头基于首帧极缓右移（左→右），模拟胸腔起伏式微晃。[00:01] 萧思远右臂猛然抬高至胸前，玉佩悬停于阳光直射焦点，表面泛起刺目青白反光（非眩光溢出，保留石纹毛茬质感）；[00:03] 他喉结剧烈上下滚动一次，随即下颌线骤然收紧，咬肌凸起；[00:05] 左手五指完全锁定、掌心朝内压向腰侧鲨鱼皮带扣，靠小臂内旋带动袍袖褶皱瞬时绷直；[00:07] 眉峰陡然上扬，瞳孔收缩，怒容爆发——语速由顿挫转为爆破式连击，natural lip-sync，每句尾字砸落如重锤。
+<Audio>
+<环境音>枯草窸窣声/风过林梢低频沙沙/远处飞鸟掠空声</环境音>
+[00:07-00:10] (左侧男人/暴怒震颤、字字凿地男声) - “素兰！你看看你这好妹妹！！这可是御赐之物！！她不要命了不成？！”
+</Audio>
+1775110687.37277414:18:07 - 模型: doubao-seedance-1-5-pro_480p
+1775110687.37277414:18:07 - 生成模式: 首帧生视频
+1775110687.37277414:18:07 - 宽高比: 16:9
+1775110687.37277414:18:07 - 时长: 10秒
+1775110687.38027514:18:07 - 音频: 有声
+1775110687.708593814:18:07 - [任务日志] 已插入 id=4 status=running
+1775110687.758640514:18:07 - 已添加文件字段 [first_frame_image]: 0001_image_20260327_162128_147742.png, 1346953 bytes
+1775110687.758640514:18:07 - 正在发送请求到: https://geek.closeai.icu/v1/videos
+1775110687.758640514:18:07 - [Geeknow最终请求] {
+  "url": "https://geek.closeai.icu/v1/videos",
+  "format": "multipart/form-data",
+  "timeout": 900,
+  "headers": {
+    "Authorization": "Bearer sk-1ZAV1V***"
+  },
+  "data": {
+    "model": "doubao-seedance-1-5-pro_480p",
+    "prompt": "图1是角色江稚鱼，图2是角色江素兰，图3是角色萧思远，图4是场景皇家秋猎空地，图5是物品御赐玉佩 , 0–10秒：镜头基于首帧极缓右移（左→右），模拟胸腔起伏式微晃。[00:01] 萧思远右臂猛然抬高至胸前，玉佩悬停于阳光直射焦点，表面泛起刺目青白反光（非眩光溢出，保留石纹毛茬质感）；[00:03] 他喉结剧烈上下滚动一次，随即下颌线骤然收紧，咬肌凸起；[00:05] 左手五指完全锁定、掌心朝内压向腰侧鲨鱼皮带扣，靠小臂内旋带动袍袖褶皱瞬时绷直；[00:07] 眉峰陡然上扬，瞳孔收缩，怒容爆发——语速由顿挫转为爆破式连击，natural lip-sync，每句尾字砸落如重锤。\n<Audio>\n<环境音>枯草窸窣声/风过林梢低频沙沙/远处飞鸟掠空声</环境音>\n[00:07-00:10] (左侧男人/暴怒震颤、字字凿地男声) - “素兰！你看看你这好妹妹！！这可是御赐之物！！她不要命了不成？！”\n</Audio>",
+    "seconds": "10",
+    "size": "16:9"
+  },
+  "files": [
+    {
+      "field": "first_frame_image",
+      "filename": "0001_image_20260327_162128_147742.png",
+      "size_bytes": 1346953,
+      "mime_type": "image/png"
+    }
+  ]
+}
+1775110705.68810214:18:25 - API 响应: {'id': 'task_6jEdASiEdB67QGysUA6mlkDUbZxSsa0w', 'task_id': 'task_6jEdASiEdB67QGysUA6mlkDUbZxSsa0w', 'object': 'video', 'model': '', 'status': 'queued', 'progress': 0, 'created_at': 1775110685}
+1775110705.68810214:18:25 - 任务ID: task_6jEdASiEdB67QGysUA6mlkDUbZxSsa0w
+1775110705.965040214:18:25 - 等待视频生成...
+1775110716.814799814:18:36 - data: {'completed_at': None, 'created_at': 1775110685, 'error': None, 'expires_at': None, 'id': 'cgt-20260402141759-4qfnx', 'metadata': None, 'model': '', 'object': 'video', 'polling_url': None, 'progress': 0, 'prompt': None, 'remixed_from_video_id': None, 'seconds': None, 'size': None, 'status': 'queued', 'usage': None, 'video_url': None}
+1775110716.815320514:18:36 - [1/300] 状态: queued, 进度: 0
+1775110727.547109814:18:47 - data: {'completed_at': None, 'created_at': 1775110685, 'error': None, 'expires_at': None, 'id': 'cgt-20260402141759-4qfnx', 'metadata': None, 'model': '', 'object': 'video', 'polling_url': None, 'progress': 0, 'prompt': None, 'remixed_from_video_id': None, 'seconds': None, 'size': None, 'status': 'queued', 'usage': None, 'video_url': None}
+1775110727.547109814:18:47 - [2/300] 状态: queued, 进度: 0
+1775110738.408446814:18:58 - data: {'created_at': 1775110703, 'id': 'cgt-20260402141759-4qfnx', 'object': 'video', 'progress': 11, 'status': 'queued'}
+1775110738.408446814:18:58 - [3/300] 状态: queued, 进度: 11
+1775110749.20306614:19:09 - data: {'created_at': 1775110726, 'id': 'cgt-20260402141759-4qfnx', 'object': 'video', 'progress': 11, 'status': 'queued'}
+1775110749.203825714:19:09 - [4/300] 状态: queued, 进度: 11
+1775110759.95663514:19:19 - data: {'created_at': 1775110726, 'id': 'cgt-20260402141759-4qfnx', 'object': 'video', 'progress': 11, 'status': 'queued'}
+1775110759.95663514:19:19 - [5/300] 状态: queued, 进度: 11
+1775110770.71976214:19:30 - data: {'created_at': 1775110734, 'id': 'cgt-20260402141759-4qfnx', 'object': 'video', 'progress': 100, 'status': 'completed', 'video_url': 'https://ark-content-generation-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-1-5-pro/02177511068565700000000000000000000ffffac1835c04d6ed3.mp4?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=AKLTYWJkZTExNjA1ZDUyNDc3YzhjNTM5OGIyNjBhNDcyOTQ%2F20260402%2Fcn-beijing%2Ftos%2Frequest&X-Tos-Date=20260402T061850Z&X-Tos-Expires=86400&X-Tos-Signature=131c187e1fe6b00105efc993d61b73fcc0c168e8ccf0b81d9d98b79001a0fcce&X-Tos-SignedHeaders=host'}
+1775110770.71976214:19:30 - [6/300] 状态: completed, 进度: 100
+1775110770.71976214:19:30 - 视频生成成功: https://ark-content-generation-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-1-5-pro/02177511068565700000000000000000000ffffac1835c04d6ed3.mp4?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=AKLTYWJkZTExNjA1ZDUyNDc3YzhjNTM5OGIyNjBhNDcyOTQ%2F20260402%2Fcn-beijing%2Ftos%2Frequest&X-Tos-Date=20260402T061850Z&X-Tos-Expires=86400&X-Tos-Signature=131c187e1fe6b00105efc993d61b73fcc0c168e8ccf0b81d9d98b79001a0fcce&X-Tos-SignedHeaders=host
+1775110770.721177814:19:30 - 正在下载视频: https://ark-content-generation-cn-beijing.tos-cn-beijing.volces.com/doubao-seedance-1-5-pro/02177511068565700000000000000000000ffffac1835c04d6ed3.mp4?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=AKLTYWJkZTExNjA1ZDUyNDc3YzhjNTM5OGIyNjBhNDcyOTQ%2F20260402%2Fcn-beijing%2Ftos%2Frequest&X-Tos-Date=20260402T061850Z&X-Tos-Expires=86400&X-Tos-Signature=131c187e1fe6b00105efc993d61b73fcc0c168e8ccf0b81d9d98b79001a0fcce&X-Tos-SignedHeaders=host
+1775110772.020928614:19:32 - 视频已保存: D:\DramaSoft\字字动画_8_0_25\工作目录\默认\3月27日\0001_video_20260402_141930_721177.mp4
+1775110772.020928614:19:32 - 文件大小: 5.76 MB
+1775110772.02203714:19:32 - ============================================================
+1775110772.276288514:19:32 - [任务日志] 已更新 id=4 status=success
