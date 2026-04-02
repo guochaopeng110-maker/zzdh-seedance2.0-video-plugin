@@ -82,6 +82,34 @@ RESOLUTION_RATIO_MAP = {
 }
 
 
+def _mask_api_key(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= 8:
+        return f"{text[:2]}***"
+    return f"{text[:4]}***{text[-2:]}"
+
+
+def _log_event(event, **fields):
+    payload = {
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "event": event,
+        "fields": fields or {},
+    }
+    print(f"[ZLHubSeedance] {json.dumps(payload, ensure_ascii=False)}")
+
+
+def _safe_progress_callback(progress_callback):
+    if callable(progress_callback):
+        return progress_callback
+
+    def _noop(_message):
+        return None
+
+    return _noop
+
+
 def get_info():
     """返回插件元数据"""
     return {
@@ -298,6 +326,7 @@ def _build_create_payload(params, prompt, reference_images=None, reference_video
 
 def _create_task(api_key, base_url, payload, timeout):
     endpoint = _normalize_base_url(base_url)
+    _log_event("create_task.request", endpoint=endpoint, timeout=timeout, api_key=_mask_api_key(api_key))
     response = requests.post(
         endpoint,
         headers=_build_auth_headers(api_key, include_content_type=True),
@@ -314,6 +343,7 @@ def _create_task(api_key, base_url, payload, timeout):
     task_id = result.get("id") or result.get("task_id")
     if not task_id:
         raise PluginFatalError("创建任务失败: 响应中缺少 task_id/id")
+    _log_event("create_task.success", task_id=task_id)
     return str(task_id), result
 
 
@@ -343,6 +373,7 @@ def _extract_video_url_from_status(task_data):
 def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_interval, progress_callback=None):
     endpoint = f"{_normalize_base_url(base_url)}/{task_id}"
     headers = _build_auth_headers(api_key, include_content_type=True)
+    previous_status = None
 
     for attempt in range(1, int(max_attempts) + 1):
         response = requests.get(endpoint, headers=headers, timeout=timeout)
@@ -354,6 +385,9 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
             raise PluginFatalError(f"状态查询返回非 JSON 响应: {exc}") from exc
 
         status = _normalize_task_status(data.get("status"))
+        if status != previous_status:
+            _log_event("poll_task.status", task_id=task_id, status=status, attempt=attempt)
+            previous_status = status
         if status == "running":
             if progress_callback:
                 progress_callback(f"任务进行中 ({attempt}/{max_attempts})")
@@ -393,6 +427,7 @@ def _download_video(api_key, base_url, task_id, video_url, output_path, timeout)
         if not target_url:
             continue
         tried.append(target_url)
+        _log_event("download.try", task_id=task_id, url=target_url)
         try:
             response = requests.get(target_url, headers=headers, timeout=timeout)
             if response.status_code == 200:
@@ -401,6 +436,7 @@ def _download_video(api_key, base_url, task_id, video_url, output_path, timeout)
                     os.makedirs(output_dir, exist_ok=True)
                 with open(output_path, "wb") as video_file:
                     video_file.write(response.content)
+                _log_event("download.success", task_id=task_id, output_path=output_path)
                 return output_path
         except requests.RequestException:
             continue
@@ -476,7 +512,7 @@ def _default_output_path(output_dir, viewer_index, task_id):
 def _run_seedance_orchestration(context):
     context = context or {}
     raw_params = context.get("plugin_params")
-    progress_callback = context.get("progress_callback")
+    progress_callback = _safe_progress_callback(context.get("progress_callback"))
 
     params = _sanitize_params(raw_params if raw_params is not None else get_params())
     polling = _normalize_polling_config(params)
@@ -492,8 +528,8 @@ def _run_seedance_orchestration(context):
     task_id = None
     video_url = None
     try:
-        if progress_callback:
-            progress_callback("参数校验完成")
+        _log_event("workflow.start", output_dir=output_dir, viewer_index=viewer_index)
+        progress_callback("参数校验完成")
 
         payload = _build_create_payload(
             params=params,
@@ -504,9 +540,8 @@ def _run_seedance_orchestration(context):
         )
 
         task_id, _ = _create_task(api_key, base_url, payload, polling["timeout"])
-        if progress_callback:
-            progress_callback("任务已创建")
-            progress_callback("状态轮询中")
+        progress_callback("任务已创建")
+        progress_callback("状态轮询中")
 
         status_data, video_url = _poll_task_status(
             api_key=api_key,
@@ -519,8 +554,7 @@ def _run_seedance_orchestration(context):
         )
 
         final_output_path = context.get("output_path") or _default_output_path(output_dir, viewer_index, task_id)
-        if progress_callback:
-            progress_callback("下载中")
+        progress_callback("下载中")
 
         downloaded_path = _download_video(
             api_key=api_key,
@@ -530,8 +564,8 @@ def _run_seedance_orchestration(context):
             output_path=final_output_path,
             timeout=polling["timeout"],
         )
-        if progress_callback:
-            progress_callback("完成")
+        progress_callback("完成")
+        _log_event("workflow.success", task_id=task_id, output_path=downloaded_path)
 
         return _build_orchestration_result(
             task_id=task_id,
@@ -543,8 +577,8 @@ def _run_seedance_orchestration(context):
         )
     except Exception as exc:
         wrapped_error = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
-        if progress_callback:
-            progress_callback("失败")
+        progress_callback("失败")
+        _log_event("workflow.failed", task_id=task_id, error=str(wrapped_error))
         return _build_orchestration_result(
             task_id=task_id,
             status="failed",
@@ -602,7 +636,17 @@ def get_params():
 
 def generate(context):
     """插件主入口点（Phase 4 已完成编排函数，Phase 5 进行宿主入口接线与 UI/日志集成）"""
-    raise NotImplementedError("generate() 将在阶段 5 中实现")
+    ctx = dict(context or {})
+    ctx["progress_callback"] = _safe_progress_callback(ctx.get("progress_callback"))
+
+    try:
+        outputs = run_seedance_workflow(ctx)
+        _log_event("generate.success", outputs=outputs)
+        return outputs
+    except PluginFatalError:
+        raise
+    except Exception as exc:
+        raise PluginFatalError(str(exc)) from exc
 
 
 if __name__ == "__main__":
