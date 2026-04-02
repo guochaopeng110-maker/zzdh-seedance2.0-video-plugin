@@ -396,7 +396,9 @@ def _download_video(api_key, base_url, task_id, video_url, output_path, timeout)
         try:
             response = requests.get(target_url, headers=headers, timeout=timeout)
             if response.status_code == 200:
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                output_dir = os.path.dirname(output_path)
+                if output_dir:
+                    os.makedirs(output_dir, exist_ok=True)
                 with open(output_path, "wb") as video_file:
                     video_file.write(response.content)
                 return output_path
@@ -427,6 +429,143 @@ def _sanitize_params(raw_params=None):
     return params
 
 
+def _normalize_polling_config(params):
+    timeout = int(params.get("timeout", DEFAULT_TIMEOUT) or DEFAULT_TIMEOUT)
+    max_attempts = int(params.get("max_poll_attempts", DEFAULT_MAX_POLL_ATTEMPTS) or DEFAULT_MAX_POLL_ATTEMPTS)
+    poll_interval = int(params.get("poll_interval", DEFAULT_POLL_INTERVAL) or DEFAULT_POLL_INTERVAL)
+    return {
+        "timeout": max(timeout, 30),
+        "max_poll_attempts": max(max_attempts, 1),
+        "poll_interval": max(poll_interval, 1),
+    }
+
+
+def _normalize_terminal_status(status, error=None):
+    normalized = _normalize_task_status(status)
+    if normalized == "completed":
+        return "completed"
+    if error and "超过最大轮询次数" in str(error):
+        return "timeout"
+    return "failed"
+
+
+def _build_orchestration_result(task_id=None, status="failed", output_path=None, video_url=None, error=None, meta=None):
+    error_text = None
+    if error:
+        if isinstance(error, PluginFatalError):
+            error_text = str(error)
+        else:
+            error_text = str(PluginFatalError(str(error)))
+
+    return {
+        "task_id": task_id,
+        "status": _normalize_terminal_status(status, error_text),
+        "output_path": output_path,
+        "video_url": video_url,
+        "error": error_text,
+        "meta": meta or {},
+    }
+
+
+def _default_output_path(output_dir, viewer_index, task_id):
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{int(viewer_index):04d}_seedance_{task_id}_{stamp}.mp4"
+    return os.path.join(output_dir, filename)
+
+
+def _run_seedance_orchestration(context):
+    context = context or {}
+    raw_params = context.get("plugin_params")
+    progress_callback = context.get("progress_callback")
+
+    params = _sanitize_params(raw_params if raw_params is not None else get_params())
+    polling = _normalize_polling_config(params)
+    base_url = _normalize_base_url(params.get("base_url", _DEFAULT_BASE_URL))
+    api_key = params.get("api_key", "")
+    prompt = context.get("prompt", "")
+    reference_images = context.get("reference_images")
+    reference_videos = context.get("reference_videos")
+    reference_audios = context.get("reference_audios")
+    output_dir = context.get("output_dir", context.get("project_path", os.getcwd()))
+    viewer_index = context.get("viewer_index", 0)
+
+    task_id = None
+    video_url = None
+    try:
+        if progress_callback:
+            progress_callback("参数校验完成")
+
+        payload = _build_create_payload(
+            params=params,
+            prompt=prompt,
+            reference_images=reference_images,
+            reference_videos=reference_videos,
+            reference_audios=reference_audios,
+        )
+
+        task_id, _ = _create_task(api_key, base_url, payload, polling["timeout"])
+        if progress_callback:
+            progress_callback("任务已创建")
+            progress_callback("状态轮询中")
+
+        status_data, video_url = _poll_task_status(
+            api_key=api_key,
+            base_url=base_url,
+            task_id=task_id,
+            timeout=polling["timeout"],
+            max_attempts=polling["max_poll_attempts"],
+            poll_interval=polling["poll_interval"],
+            progress_callback=progress_callback,
+        )
+
+        final_output_path = context.get("output_path") or _default_output_path(output_dir, viewer_index, task_id)
+        if progress_callback:
+            progress_callback("下载中")
+
+        downloaded_path = _download_video(
+            api_key=api_key,
+            base_url=base_url,
+            task_id=task_id,
+            video_url=video_url,
+            output_path=final_output_path,
+            timeout=polling["timeout"],
+        )
+        if progress_callback:
+            progress_callback("完成")
+
+        return _build_orchestration_result(
+            task_id=task_id,
+            status=status_data.get("status"),
+            output_path=downloaded_path,
+            video_url=video_url,
+            error=None,
+            meta={"polling": polling},
+        )
+    except Exception as exc:
+        wrapped_error = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
+        if progress_callback:
+            progress_callback("失败")
+        return _build_orchestration_result(
+            task_id=task_id,
+            status="failed",
+            output_path=None,
+            video_url=video_url,
+            error=wrapped_error,
+            meta={"polling": polling},
+        )
+
+
+def _map_orchestration_to_plugin_output(result):
+    if result.get("status") == "completed" and result.get("output_path"):
+        output_path = result["output_path"]
+        return [output_path]
+    raise PluginFatalError(result.get("error") or "工作流执行失败")
+
+
+def run_seedance_workflow(context):
+    return _map_orchestration_to_plugin_output(_run_seedance_orchestration(context))
+
+
 def run_seedance_client(
     prompt,
     output_path=None,
@@ -436,54 +575,17 @@ def run_seedance_client(
     reference_audios=None,
     progress_callback=None,
 ):
-    params = _sanitize_params(plugin_params if plugin_params is not None else get_params())
-    base_url = _normalize_base_url(params.get("base_url", _DEFAULT_BASE_URL))
-    timeout = int(params.get("timeout", DEFAULT_TIMEOUT))
-    max_attempts = int(params.get("max_poll_attempts", DEFAULT_MAX_POLL_ATTEMPTS))
-    poll_interval = int(params.get("poll_interval", DEFAULT_POLL_INTERVAL))
-    api_key = params.get("api_key", "")
-
-    payload = _build_create_payload(
-        params,
-        prompt,
-        reference_images=reference_images,
-        reference_videos=reference_videos,
-        reference_audios=reference_audios,
-    )
-    task_id, _ = _create_task(api_key, base_url, payload, timeout)
-    if progress_callback:
-        progress_callback("任务已创建，开始轮询")
-
-    status_data, video_url = _poll_task_status(
-        api_key=api_key,
-        base_url=base_url,
-        task_id=task_id,
-        timeout=timeout,
-        max_attempts=max_attempts,
-        poll_interval=poll_interval,
-        progress_callback=progress_callback,
-    )
-
-    final_output_path = output_path
-    if not final_output_path:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        final_output_path = os.path.join(os.getcwd(), f"seedance_{task_id}_{timestamp}.mp4")
-
-    downloaded_path = _download_video(
-        api_key=api_key,
-        base_url=base_url,
-        task_id=task_id,
-        video_url=video_url,
-        output_path=final_output_path,
-        timeout=timeout,
-    )
-
-    return {
-        "task_id": task_id,
-        "status": _normalize_task_status(status_data.get("status")),
-        "video_url": video_url,
-        "output_path": downloaded_path,
+    """Phase 3 compatibility wrapper. Prefer run_seedance_workflow(context) in Phase 4+."""
+    context = {
+        "prompt": prompt,
+        "output_path": output_path,
+        "plugin_params": plugin_params,
+        "reference_images": reference_images,
+        "reference_videos": reference_videos,
+        "reference_audios": reference_audios,
+        "progress_callback": progress_callback,
     }
+    return _run_seedance_orchestration(context)
 
 
 def get_params():
@@ -499,7 +601,7 @@ def get_params():
 
 
 def generate(context):
-    """插件主入口点（阶段 4/5 负责编排调用）"""
+    """插件主入口点（Phase 4 已完成编排函数，Phase 5 进行宿主入口接线与 UI/日志集成）"""
     raise NotImplementedError("generate() 将在阶段 5 中实现")
 
 
@@ -510,6 +612,12 @@ if __name__ == "__main__":
         "_create_task",
         "_poll_task_status",
         "_download_video",
+        "_normalize_polling_config",
+        "_normalize_terminal_status",
+        "_build_orchestration_result",
+        "_run_seedance_orchestration",
+        "_map_orchestration_to_plugin_output",
+        "run_seedance_workflow",
         "run_seedance_client",
     ]
     missing = [name for name in required_funcs if not callable(globals().get(name))]
