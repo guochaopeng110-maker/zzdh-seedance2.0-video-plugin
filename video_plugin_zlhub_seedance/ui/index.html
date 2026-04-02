@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>ZLHub Seedance 视频生成插件</title>
+  <title>ZLHub Seedance 瑙嗛鐢熸垚鎻掍欢</title>
   <link rel="stylesheet" href="../../../plugin-sdk.css">
   <style>
     .api-key-wrapper {
@@ -57,8 +57,8 @@
   </style>
 </head>
 <body>
-  <h3>ZLHub Seedance 视频生成插件</h3>
-  <p class="hint-text">对接 ZLHub 中转平台，使用 Seedance 2.0 模型生成视频。</p>
+  <h3>ZLHub Seedance 瑙嗛鐢熸垚鎻掍欢</h3>
+  <p class="hint-text">瀵规帴 ZLHub 涓浆骞冲彴锛屼娇鐢?Seedance 2.0 妯″瀷鐢熸垚瑙嗛銆?/p>
   <hr>
 
   <div class="form-row">
@@ -72,111 +72,118 @@
   </div>
 
   <div class="form-row">
-    <label class="form-label">API 地址</label>
+    <label class="form-label">API 鍦板潃</label>
     <div class="form-control">
       <select id="baseUrlSelect">
-        <option value="https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks" selected>ZLHub 标准 (Default)</option>
+        <option value="https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks" selected>ZLHub 鏍囧噯 (Default)</option>
       </select>
     </div>
   </div>
 
-  <div class="form-row">
-    <label class="form-label">分辨率</label>
+    <div class="form-row">
+    <label class="form-label">Model</label>
+    <div class="form-control">
+      <select id="modelSelect">
+        <option value="doubao-seedance-2.0" selected>doubao-seedance-2.0</option>
+      </select>
+    </div>
+  </div>
+<div class="form-row">
+    <label class="form-label">鍒嗚鲸鐜?/label>
     <div class="form-control">
       <select id="resolutionSelect">
-        <option value="720p">720p (默认)</option>
+        <option value="720p">720p (榛樿)</option>
         <option value="480p">480p</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">宽高比 (Ratio)</label>
+    <label class="form-label">瀹介珮姣?(Ratio)</label>
     <div class="form-control">
       <select id="ratioSelect">
-        <option value="adaptive">adaptive (自动适配)</option>
-        <option value="16:9">16:9 (横屏)</option>
-        <option value="9:16">9:16 (竖屏)</option>
+        <option value="adaptive">adaptive (鑷姩閫傞厤)</option>
+        <option value="16:9">16:9 (妯睆)</option>
+        <option value="9:16">9:16 (绔栧睆)</option>
         <option value="4:3">4:3</option>
         <option value="3:4">3:4</option>
-        <option value="1:1">1:1 (正方形)</option>
+        <option value="1:1">1:1 (姝ｆ柟褰?</option>
         <option value="21:9">21:9</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">视频时长 (Duration)</label>
+    <label class="form-label">瑙嗛鏃堕暱 (Duration)</label>
     <div class="form-control">
       <select id="durationSelect">
-        <option value="5">5秒 (默认)</option>
-        <option value="-1">模型决定 (-1)</option>
-        <option value="4">4秒</option>
-        <option value="8">8秒</option>
-        <option value="10">10秒</option>
-        <option value="12">12秒</option>
-        <option value="15">15秒</option>
+        <option value="5">5绉?(榛樿)</option>
+        <option value="-1">妯″瀷鍐冲畾 (-1)</option>
+        <option value="4">4绉?/option>
+        <option value="8">8绉?/option>
+        <option value="10">10绉?/option>
+        <option value="12">12绉?/option>
+        <option value="15">15绉?/option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">生成音频</label>
+    <label class="form-label">鐢熸垚闊抽</label>
     <div class="form-control">
       <select id="generateAudioSelect">
-        <option value="true">开启 (默认)</option>
-        <option value="false">关闭 (无声)</option>
+        <option value="true">寮€鍚?(榛樿)</option>
+        <option value="false">鍏抽棴 (鏃犲０)</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">联网搜索 (Web Search)</label>
+    <label class="form-label">鑱旂綉鎼滅储 (Web Search)</label>
     <div class="form-control">
       <select id="webSearchSelect">
-        <option value="false">禁用 (默认)</option>
-        <option value="true">启用</option>
+        <option value="false">绂佺敤 (榛樿)</option>
+        <option value="true">鍚敤</option>
       </select>
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">超时时间(秒)</label>
+    <label class="form-label">瓒呮椂鏃堕棿(绉?</label>
     <div class="form-control">
       <input type="number" id="timeoutInput" min="60" max="3600" step="1" value="900">
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">最大轮询次数</label>
+    <label class="form-label">鏈€澶ц疆璇㈡鏁?/label>
     <div class="form-control">
       <input type="number" id="maxPollAttemptsInput" min="1" max="2000" step="1" value="300">
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">轮询间隔(秒)</label>
+    <label class="form-label">杞闂撮殧(绉?</label>
     <div class="form-control">
       <input type="number" id="pollIntervalInput" min="1" max="120" step="1" value="5">
     </div>
   </div>
 
   <div class="form-row">
-    <label class="form-label">重试次数</label>
+    <label class="form-label">閲嶈瘯娆℃暟</label>
     <div class="form-control">
       <input type="number" id="retryCountInput" min="0" max="10" step="1" value="3">
     </div>
   </div>
 
   <div class="hint-text">
-    <strong>Seedance 2.0 约束提示：</strong><br>
-    - 图片大小需小于 30MB。<br>
-    - 文本建议：中文 ≤ 500字，英文 ≤ 1000词。
-  </div>
+    <strong>Seedance 2.0 绾︽潫鎻愮ず锛?/strong><br>
+    - 鍥剧墖澶у皬闇€灏忎簬 30MB銆?br>
+    - 鏂囨湰寤鸿锛氫腑鏂?鈮?500瀛楋紝鑻辨枃 鈮?1000璇嶃€?  </div>
 
   <div class="action-buttons">
-    <button id="btnTaskLog" type="button">任务日志 / 手动拉取</button>
-    <button id="btnLiveLog" type="button">实时日志</button>
+    <button id="btnTaskLog" type="button">浠诲姟鏃ュ織 / 鎵嬪姩鎷夊彇</button>
+    <button id="btnLiveLog" type="button">瀹炴椂鏃ュ織</button>
   </div>
 
   <script src="../../../plugin-sdk.js"></script>
@@ -190,6 +197,7 @@
     var webSearchSelect = document.getElementById('webSearchSelect');
     var timeoutInput = document.getElementById('timeoutInput');
     var baseUrlSelect = document.getElementById('baseUrlSelect');
+    var modelSelect = document.getElementById('modelSelect');
     var maxPollAttemptsInput = document.getElementById('maxPollAttemptsInput');
     var pollIntervalInput = document.getElementById('pollIntervalInput');
     var retryCountInput = document.getElementById('retryCountInput');
@@ -212,6 +220,10 @@
 
     baseUrlSelect.addEventListener('change', function () {
       PluginSDK.saveParam('base_url', baseUrlSelect.value);
+    });
+
+    modelSelect.addEventListener('change', function () {
+      PluginSDK.saveParam('model', modelSelect.value);
     });
 
     resolutionSelect.addEventListener('change', function () {
@@ -261,6 +273,7 @@
     PluginSDK.onReady(function (params) {
       if (params.api_key) apiKeyInput.value = params.api_key;
       if (params.base_url) baseUrlSelect.value = params.base_url;
+      if (params.model) modelSelect.value = params.model;
       if (params.resolution) resolutionSelect.value = params.resolution;
       if (params.ratio) ratioSelect.value = params.ratio;
       if (params.duration != null) durationSelect.value = String(params.duration);
@@ -274,3 +287,4 @@
   </script>
 </body>
 </html>
+

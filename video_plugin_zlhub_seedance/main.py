@@ -57,7 +57,7 @@ _BASE_URL_OPTIONS = [
 ]
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
 
-DEFAULT_MODEL = "seedance-2.0"
+DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
 DEFAULT_RATIO = "adaptive"
 DEFAULT_DURATION = 5
@@ -373,6 +373,13 @@ def _normalize_duration(value):
     return duration
 
 
+def _normalize_model(value):
+    model = str(value or "").strip()
+    if not model:
+        return DEFAULT_MODEL
+    return model
+
+
 def _normalize_audio_generation(value):
     if isinstance(value, bool):
         return value
@@ -653,6 +660,7 @@ def _sanitize_params(raw_params=None):
     params = _default_params.copy()
     params.update(raw_params)
 
+    params["model"] = _normalize_model(params.get("model"))
     params["resolution"] = _normalize_resolution(params.get("resolution"))
     params["ratio"] = _normalize_aspect_ratio(params.get("ratio"))
     params["duration"] = _normalize_duration(params.get("duration"))
