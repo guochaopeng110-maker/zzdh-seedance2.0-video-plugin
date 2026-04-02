@@ -5,11 +5,15 @@ ZLHub Seedance 2.0 视频生成插件。
 """
 
 import base64
+import collections
 import json
 import mimetypes
 import os
+import sqlite3
+import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
@@ -25,6 +29,13 @@ except ImportError:
 
 
 PLUGIN_ERROR_PREFIX = "PLUGIN_ERROR:::"
+_PLUGIN_VERSION = "1.1.0"
+plugin_dir = Path(__file__).parent
+_TASK_LOG_DB_PATH = plugin_dir / "video_task_logs.db"
+_MANUAL_DOWNLOAD_DIR = plugin_dir / "downloads"
+_log_buffer = collections.deque(maxlen=2000)
+_log_index = 0
+_log_lock = threading.Lock()
 
 
 class PluginFatalError(Exception):
@@ -91,13 +102,172 @@ def _mask_api_key(value):
     return f"{text[:4]}***{text[-2:]}"
 
 
+def _append_live_log(level, message):
+    global _log_index
+    with _log_lock:
+        _log_index += 1
+        _log_buffer.append({
+            "index": _log_index,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "level": str(level or "INFO"),
+            "msg": str(message or ""),
+        })
+
+
+def get_buffered_logs(since_index=0):
+    try:
+        since = int(since_index or 0)
+    except (TypeError, ValueError):
+        since = 0
+    with _log_lock:
+        return [entry for entry in list(_log_buffer) if entry.get("index", 0) > since]
+
+
+def _db_conn():
+    conn = sqlite3.connect(str(_TASK_LOG_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_task_log_db():
+    conn = _db_conn()
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS video_task_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              created_at TEXT,
+              updated_at TEXT,
+              api_task_id TEXT,
+              model_name TEXT,
+              model_display TEXT,
+              prompt TEXT,
+              aspect_ratio TEXT,
+              duration TEXT,
+              generation_mode TEXT,
+              status TEXT,
+              error TEXT,
+              video_url TEXT,
+              local_path TEXT,
+              metadata TEXT
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _insert_task_log(entry):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = _db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO video_task_logs
+            (created_at, updated_at, api_task_id, model_name, model_display, prompt, aspect_ratio,
+             duration, generation_mode, status, error, video_url, local_path, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                now,
+                now,
+                entry.get("api_task_id"),
+                entry.get("model_name"),
+                entry.get("model_display"),
+                entry.get("prompt"),
+                entry.get("aspect_ratio"),
+                entry.get("duration"),
+                entry.get("generation_mode"),
+                entry.get("status"),
+                entry.get("error"),
+                entry.get("video_url"),
+                entry.get("local_path"),
+                json.dumps(entry.get("metadata") or {}, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def _update_task_log(log_id, **fields):
+    if not log_id:
+        return
+    updates = []
+    values = []
+    for key, value in fields.items():
+        updates.append(f"{key} = ?")
+        values.append(value)
+    updates.append("updated_at = ?")
+    values.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    values.append(log_id)
+    conn = _db_conn()
+    try:
+        conn.execute(f"UPDATE video_task_logs SET {', '.join(updates)} WHERE id = ?", values)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _query_task_logs(limit=200, status=None):
+    conn = _db_conn()
+    try:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM video_task_logs WHERE status = ? ORDER BY id DESC LIMIT ?",
+                (status, int(limit)),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM video_task_logs ORDER BY id DESC LIMIT ?",
+                (int(limit),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def _safe_filename(name):
+    return "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in str(name or ""))
+
+
+def _manual_download_video(task_row):
+    url = task_row.get("video_url")
+    if not url:
+        return {"id": task_row.get("id"), "status": "manual_failed", "error": "任务无 video_url"}
+    _MANUAL_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    base_name = _safe_filename(task_row.get("api_task_id") or f"task_{task_row.get('id')}")
+    file_path = _MANUAL_DOWNLOAD_DIR / f"{base_name}.mp4"
+    headers = {
+        "User-Agent": DOWNLOAD_USER_AGENT,
+        "Referer": DOWNLOAD_REFERER,
+        "Accept": "*/*",
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=120)
+        if resp.status_code != 200:
+            raise PluginFatalError(f"下载失败: HTTP {resp.status_code}")
+        with open(file_path, "wb") as fw:
+            fw.write(resp.content)
+        _update_task_log(task_row.get("id"), local_path=str(file_path), status="manual_success")
+        return {"id": task_row.get("id"), "status": "manual_success", "path": str(file_path)}
+    except Exception as exc:
+        _update_task_log(task_row.get("id"), status="manual_failed", error=str(exc))
+        return {"id": task_row.get("id"), "status": "manual_failed", "error": str(exc)}
+
+
 def _log_event(event, **fields):
     payload = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "event": event,
         "fields": fields or {},
     }
-    print(f"[ZLHubSeedance] {json.dumps(payload, ensure_ascii=False)}")
+    text = f"[ZLHubSeedance] {json.dumps(payload, ensure_ascii=False)}"
+    print(text)
+    _append_live_log("INFO", text)
 
 
 def _safe_progress_callback(progress_callback):
@@ -115,7 +285,7 @@ def get_info():
     return {
         "name": "ZLHub Seedance 视频生成",
         "description": "对接 ZLHub 中转平台的 Seedance 2.0 视频大模型接口。",
-        "version": "1.0.0",
+        "version": _PLUGIN_VERSION,
         "author": "Z Code",
     }
 
@@ -527,9 +697,22 @@ def _run_seedance_orchestration(context):
 
     task_id = None
     video_url = None
+    task_log_id = None
     try:
         _log_event("workflow.start", output_dir=output_dir, viewer_index=viewer_index)
         progress_callback("参数校验完成")
+
+        task_log_id = _insert_task_log({
+            "api_task_id": None,
+            "model_name": params.get("model"),
+            "model_display": params.get("model"),
+            "prompt": str(prompt or "")[:500],
+            "aspect_ratio": params.get("ratio"),
+            "duration": str(params.get("duration")),
+            "generation_mode": "zlhub_seedance",
+            "status": "running",
+            "metadata": {"polling": polling},
+        })
 
         payload = _build_create_payload(
             params=params,
@@ -540,6 +723,7 @@ def _run_seedance_orchestration(context):
         )
 
         task_id, _ = _create_task(api_key, base_url, payload, polling["timeout"])
+        _update_task_log(task_log_id, api_task_id=task_id)
         progress_callback("任务已创建")
         progress_callback("状态轮询中")
 
@@ -566,6 +750,7 @@ def _run_seedance_orchestration(context):
         )
         progress_callback("完成")
         _log_event("workflow.success", task_id=task_id, output_path=downloaded_path)
+        _update_task_log(task_log_id, status="success", video_url=video_url, local_path=downloaded_path, error=None)
 
         return _build_orchestration_result(
             task_id=task_id,
@@ -579,6 +764,8 @@ def _run_seedance_orchestration(context):
         wrapped_error = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
         progress_callback("失败")
         _log_event("workflow.failed", task_id=task_id, error=str(wrapped_error))
+        status = "download_failed" if "下载视频失败" in str(wrapped_error) else "failed"
+        _update_task_log(task_log_id, status=status, video_url=video_url, error=str(wrapped_error))
         return _build_orchestration_result(
             task_id=task_id,
             status="failed",
@@ -649,6 +836,39 @@ def generate(context):
         raise PluginFatalError(str(exc)) from exc
 
 
+def handle_action(action, data=None):
+    payload = data or {}
+    if action == "open_live_logs":
+        return {"ok": True, "open_page": "live_log.html"}
+    if action == "open_task_logs":
+        return {"ok": True, "open_page": "task_log.html"}
+    if action == "get_logs":
+        return {"ok": True, "entries": get_buffered_logs(payload.get("since_index", 0))}
+    if action == "get_task_logs":
+        status = payload.get("status")
+        limit = payload.get("limit", 200)
+        return {"ok": True, "logs": _query_task_logs(limit=limit, status=status)}
+    if action == "download_videos":
+        task_ids = payload.get("task_ids") or []
+        if not task_ids:
+            return {"ok": False, "error": "未选择任务"}
+        rows = []
+        conn = _db_conn()
+        try:
+            for task_id in task_ids:
+                row = conn.execute("SELECT * FROM video_task_logs WHERE id = ?", (int(task_id),)).fetchone()
+                if row:
+                    rows.append(dict(row))
+        finally:
+            conn.close()
+        results = [_manual_download_video(row) for row in rows]
+        return {"ok": True, "results": results}
+    return {"ok": False, "error": f"未知动作: {action}"}
+
+
+_init_task_log_db()
+
+
 if __name__ == "__main__":
     required_funcs = [
         "_build_auth_headers",
@@ -663,6 +883,7 @@ if __name__ == "__main__":
         "_map_orchestration_to_plugin_output",
         "run_seedance_workflow",
         "run_seedance_client",
+        "handle_action",
     ]
     missing = [name for name in required_funcs if not callable(globals().get(name))]
     if missing:

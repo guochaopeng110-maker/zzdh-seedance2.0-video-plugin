@@ -11,7 +11,7 @@
 | 3 | API 客户端 | 构建 ZLHub Seedance 2.0 集成 | API-01, API-02, API-03, API-04 | ✓ |
 | 4 | 逻辑编排 | 串联端到端任务生命周期 (轮询/下载) | ORCH-01, ORCH-02, ORCH-03 | ✓ |
 | 5 | UI 与集成 | 完成宿主回调和错误处理 | ERR-01, ERR-02, ERR-03, CONT-03 | ⚠ |
-| 6 | 实时日志与任务日志界面 | 为 zlhub 插件增加实时日志和任务日志界面（参考 geeknow） | TBD | ☐ |
+| 6 | 实时日志与任务日志界面 | 1/1 | Complete    | 2026-04-02 |
 
 ---
 
@@ -103,7 +103,7 @@
 **Plans:** 0 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+- [x] TBD (run /gsd:plan-phase 6 to break down) (completed 2026-04-02)
 
 ---
 *最后更新：2026-04-02*

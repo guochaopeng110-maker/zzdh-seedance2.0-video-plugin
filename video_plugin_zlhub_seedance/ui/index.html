@@ -42,6 +42,18 @@
     .form-row {
       margin-bottom: 12px;
     }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .action-buttons button {
+      flex: 1;
+      padding: 7px 0;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -162,6 +174,11 @@
     - 文本建议：中文 ≤ 500字，英文 ≤ 1000词。
   </div>
 
+  <div class="action-buttons">
+    <button id="btnTaskLog" type="button">任务日志 / 手动拉取</button>
+    <button id="btnLiveLog" type="button">实时日志</button>
+  </div>
+
   <script src="../../../plugin-sdk.js"></script>
   <script>
     var apiKeyInput = document.getElementById('apiKeyInput');
@@ -176,6 +193,8 @@
     var maxPollAttemptsInput = document.getElementById('maxPollAttemptsInput');
     var pollIntervalInput = document.getElementById('pollIntervalInput');
     var retryCountInput = document.getElementById('retryCountInput');
+    var btnTaskLog = document.getElementById('btnTaskLog');
+    var btnLiveLog = document.getElementById('btnLiveLog');
 
     toggleEye.addEventListener('click', function () {
       if (apiKeyInput.type === 'password') {
@@ -229,6 +248,14 @@
 
     retryCountInput.addEventListener('change', function () {
       PluginSDK.saveParam('retry_count', parseInt(retryCountInput.value, 10) || 3);
+    });
+
+    btnTaskLog.addEventListener('click', function () {
+      PluginSDK.sendAction('open_task_logs');
+    });
+
+    btnLiveLog.addEventListener('click', function () {
+      PluginSDK.sendAction('open_live_logs');
     });
 
     PluginSDK.onReady(function (params) {
