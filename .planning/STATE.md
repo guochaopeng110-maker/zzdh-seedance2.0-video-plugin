@@ -5,7 +5,7 @@ milestone_name: milestone
 status: active
 last_updated: "2026-04-02T12:00:00.000Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
   total_plans: 5
   completed_plans: 5
@@ -52,3 +52,8 @@ progress:
 
 ---
 *最后更新：2026-04-02*
+
+## Accumulated Context
+
+### Roadmap Evolution
+- Phase 6 added: 为 zlhub 插件增加实时日志和任务日志界面（参考 geeknow）
