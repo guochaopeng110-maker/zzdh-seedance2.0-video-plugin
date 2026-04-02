@@ -33,6 +33,7 @@ _PLUGIN_VERSION = "1.1.0"
 plugin_dir = Path(__file__).parent
 _TASK_LOG_DB_PATH = plugin_dir / "video_task_logs.db"
 _MANUAL_DOWNLOAD_DIR = plugin_dir / "downloads"
+_FILE_LOG_PATH = plugin_dir / "debug_runtime.log"
 _log_buffer = collections.deque(maxlen=2000)
 _log_index = 0
 _log_lock = threading.Lock()
@@ -102,6 +103,26 @@ def _mask_api_key(value):
     return f"{text[:4]}***{text[-2:]}"
 
 
+def _build_params_log_snapshot(params):
+    params = params or {}
+    api_key = str(params.get("api_key", "") or "").strip()
+    return {
+        "api_key_masked": _mask_api_key(api_key),
+        "api_key_present": bool(api_key),
+        "base_url": params.get("base_url"),
+        "model": params.get("model"),
+        "resolution": params.get("resolution"),
+        "ratio": params.get("ratio"),
+        "duration": params.get("duration"),
+        "generate_audio": params.get("generate_audio"),
+        "web_search": params.get("web_search"),
+        "timeout": params.get("timeout"),
+        "max_poll_attempts": params.get("max_poll_attempts"),
+        "poll_interval": params.get("poll_interval"),
+        "retry_count": params.get("retry_count"),
+    }
+
+
 def _append_live_log(level, message):
     global _log_index
     with _log_lock:
@@ -112,6 +133,17 @@ def _append_live_log(level, message):
             "level": str(level or "INFO"),
             "msg": str(message or ""),
         })
+
+
+def _append_file_log(level, message):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] [{str(level or 'INFO')}] {str(message or '')}\n"
+    try:
+        with open(_FILE_LOG_PATH, "a", encoding="utf-8") as fw:
+            fw.write(line)
+    except Exception:
+        # Never break plugin flow because file logging failed.
+        return
 
 
 def get_buffered_logs(since_index=0):
@@ -268,6 +300,7 @@ def _log_event(event, **fields):
     text = f"[ZLHubSeedance] {json.dumps(payload, ensure_ascii=False)}"
     print(text)
     _append_live_log("INFO", text)
+    _append_file_log("INFO", text)
 
 
 def _safe_progress_callback(progress_callback):
@@ -694,12 +727,21 @@ def _run_seedance_orchestration(context):
     reference_audios = context.get("reference_audios")
     output_dir = context.get("output_dir", context.get("project_path", os.getcwd()))
     viewer_index = context.get("viewer_index", 0)
+    prompt_text = str(prompt or "")
 
     task_id = None
     video_url = None
     task_log_id = None
     try:
         _log_event("workflow.start", output_dir=output_dir, viewer_index=viewer_index)
+        _log_event(
+            "workflow.params",
+            params=_build_params_log_snapshot(params),
+            prompt_length=len(prompt_text),
+            has_reference_images=bool(reference_images),
+            has_reference_videos=bool(reference_videos),
+            has_reference_audios=bool(reference_audios),
+        )
         progress_callback("参数校验完成")
 
         task_log_id = _insert_task_log({
@@ -825,19 +867,23 @@ def generate(context):
     """插件主入口点（Phase 4 已完成编排函数，Phase 5 进行宿主入口接线与 UI/日志集成）"""
     ctx = dict(context or {})
     ctx["progress_callback"] = _safe_progress_callback(ctx.get("progress_callback"))
+    _append_file_log("INFO", "generate.enter")
 
     try:
         outputs = run_seedance_workflow(ctx)
         _log_event("generate.success", outputs=outputs)
         return outputs
     except PluginFatalError:
+        _append_file_log("ERROR", "generate.plugin_fatal_error")
         raise
     except Exception as exc:
+        _append_file_log("ERROR", f"generate.unhandled_exception: {exc}")
         raise PluginFatalError(str(exc)) from exc
 
 
 def handle_action(action, data=None):
     payload = data or {}
+    _append_file_log("DEBUG", f"handle_action: {action}")
     if action == "open_live_logs":
         return {"ok": True, "open_page": "live_log.html"}
     if action == "open_task_logs":
@@ -867,6 +913,7 @@ def handle_action(action, data=None):
 
 
 _init_task_log_db()
+_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
 
 
 if __name__ == "__main__":
