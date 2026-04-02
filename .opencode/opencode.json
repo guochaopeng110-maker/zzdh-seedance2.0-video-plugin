@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "permission": {
     "read": {
       "F:/Projects/zz-video-plugins/.opencode/get-shit-done/*": "allow"
