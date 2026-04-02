@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ZLHub Seedance 2.0 视频生成插件。
+TDu&ZLHub Seedance 2.0 视频生成插件。
 对接 ZLHub 中转平台，支持 Seedance 2.0 视频大模型。
 """
 
@@ -21,6 +21,7 @@ import requests
 try:
     from plugin_utils import load_plugin_config, save_plugin_config
 except ImportError:
+
     def load_plugin_config(path):
         return {}
 
@@ -54,7 +55,10 @@ _PLUGIN_FILE = __file__
 
 # 配置选项
 _BASE_URL_OPTIONS = [
-    ("ZLHub", "https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks"),
+    (
+        "ZLHub",
+        "https://zlhub.xiaowaiyou.cn/zhonglian/api/v1/proxy/ark/contents/generations/tasks",
+    ),
 ]
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
 
@@ -69,7 +73,9 @@ DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
 DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
 DEFAULT_POLL_INTERVAL = 5
-DOWNLOAD_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+DOWNLOAD_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+)
 DOWNLOAD_REFERER = "https://zlhub.xiaowaiyou.cn/"
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp", ".bmp", ".tiff", ".gif"}
@@ -128,12 +134,14 @@ def _append_live_log(level, message):
     global _log_index
     with _log_lock:
         _log_index += 1
-        _log_buffer.append({
-            "index": _log_index,
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "level": str(level or "INFO"),
-            "msg": str(message or ""),
-        })
+        _log_buffer.append(
+            {
+                "index": _log_index,
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "level": str(level or "INFO"),
+                "msg": str(message or ""),
+            }
+        )
 
 
 def _append_file_log(level, message):
@@ -239,7 +247,9 @@ def _update_task_log(log_id, **fields):
     values.append(log_id)
     conn = _db_conn()
     try:
-        conn.execute(f"UPDATE video_task_logs SET {', '.join(updates)} WHERE id = ?", values)
+        conn.execute(
+            f"UPDATE video_task_logs SET {', '.join(updates)} WHERE id = ?", values
+        )
         conn.commit()
     finally:
         conn.close()
@@ -264,15 +274,23 @@ def _query_task_logs(limit=200, status=None):
 
 
 def _safe_filename(name):
-    return "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in str(name or ""))
+    return "".join(
+        ch if ch.isalnum() or ch in ("-", "_", ".") else "_" for ch in str(name or "")
+    )
 
 
 def _manual_download_video(task_row):
     url = task_row.get("video_url")
     if not url:
-        return {"id": task_row.get("id"), "status": "manual_failed", "error": "任务无 video_url"}
+        return {
+            "id": task_row.get("id"),
+            "status": "manual_failed",
+            "error": "任务无 video_url",
+        }
     _MANUAL_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    base_name = _safe_filename(task_row.get("api_task_id") or f"task_{task_row.get('id')}")
+    base_name = _safe_filename(
+        task_row.get("api_task_id") or f"task_{task_row.get('id')}"
+    )
     file_path = _MANUAL_DOWNLOAD_DIR / f"{base_name}.mp4"
     headers = {
         "User-Agent": DOWNLOAD_USER_AGENT,
@@ -285,8 +303,14 @@ def _manual_download_video(task_row):
             raise PluginFatalError(f"下载失败: HTTP {resp.status_code}")
         with open(file_path, "wb") as fw:
             fw.write(resp.content)
-        _update_task_log(task_row.get("id"), local_path=str(file_path), status="manual_success")
-        return {"id": task_row.get("id"), "status": "manual_success", "path": str(file_path)}
+        _update_task_log(
+            task_row.get("id"), local_path=str(file_path), status="manual_success"
+        )
+        return {
+            "id": task_row.get("id"),
+            "status": "manual_success",
+            "path": str(file_path),
+        }
     except Exception as exc:
         _update_task_log(task_row.get("id"), status="manual_failed", error=str(exc))
         return {"id": task_row.get("id"), "status": "manual_failed", "error": str(exc)}
@@ -308,7 +332,7 @@ def _truncate_value(value, max_len=1000):
     text = str(value or "")
     if len(text) <= int(max_len):
         return text
-    return f"{text[:int(max_len)]}...(truncated, total={len(text)})"
+    return f"{text[: int(max_len)]}...(truncated, total={len(text)})"
 
 
 def _build_payload_log_snapshot(payload):
@@ -320,13 +344,25 @@ def _build_payload_log_snapshot(payload):
                 for item in value:
                     if isinstance(item, dict):
                         item_copy = dict(item)
-                        if item_copy.get("type") == "text" and isinstance(item_copy.get("text"), str):
-                            item_copy["text"] = _truncate_value(item_copy.get("text"), max_len=1000)
-                        if item_copy.get("type") in {"image_url", "video_url", "audio_url"}:
+                        if item_copy.get("type") == "text" and isinstance(
+                            item_copy.get("text"), str
+                        ):
+                            item_copy["text"] = _truncate_value(
+                                item_copy.get("text"), max_len=1000
+                            )
+                        if item_copy.get("type") in {
+                            "image_url",
+                            "video_url",
+                            "audio_url",
+                        }:
                             media_field = item_copy.get(item_copy.get("type"))
-                            if isinstance(media_field, dict) and isinstance(media_field.get("url"), str):
+                            if isinstance(media_field, dict) and isinstance(
+                                media_field.get("url"), str
+                            ):
                                 media_field = dict(media_field)
-                                media_field["url"] = _truncate_value(media_field.get("url"), max_len=400)
+                                media_field["url"] = _truncate_value(
+                                    media_field.get("url"), max_len=400
+                                )
                                 item_copy[item_copy.get("type")] = media_field
                         items.append(item_copy)
                     else:
@@ -366,7 +402,7 @@ def _safe_progress_callback(progress_callback):
 def get_info():
     """返回插件元数据"""
     return {
-        "name": "ZLHub Seedance 视频生成",
+        "name": "TDu&ZLHub Seedance 视频生成",
         "description": "对接 ZLHub 中转平台的 Seedance 2.0 视频大模型接口。",
         "version": _PLUGIN_VERSION,
         "author": "Z Code",
@@ -471,7 +507,9 @@ def _validate_image_constraints(image_path):
     ext = os.path.splitext(path_text)[1].lower()
     if ext not in SUPPORTED_IMAGE_EXTENSIONS:
         allowed = ", ".join(sorted(SUPPORTED_IMAGE_EXTENSIONS))
-        raise PluginFatalError(f"图片格式不支持: {ext or 'unknown'}，支持格式: {allowed}")
+        raise PluginFatalError(
+            f"图片格式不支持: {ext or 'unknown'}，支持格式: {allowed}"
+        )
 
     size_bytes = os.path.getsize(path_text)
     if size_bytes >= MAX_IMAGE_SIZE_BYTES:
@@ -501,7 +539,9 @@ def _build_auth_headers(api_key, include_content_type=True):
 def _ensure_success_response(response, operation_name):
     if response.status_code != 200:
         detail = response.text
-        raise PluginFatalError(f"{operation_name}失败: HTTP {response.status_code} - {detail}")
+        raise PluginFatalError(
+            f"{operation_name}失败: HTTP {response.status_code} - {detail}"
+        )
 
 
 def _normalize_list_or_single(value):
@@ -510,7 +550,11 @@ def _normalize_list_or_single(value):
     if isinstance(value, (list, tuple)):
         return [item for item in value if item]
     if isinstance(value, dict):
-        return [item for _, item in sorted(value.items(), key=lambda pair: str(pair[0])) if item]
+        return [
+            item
+            for _, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+            if item
+        ]
     return [value] if value else []
 
 
@@ -535,7 +579,13 @@ def file_to_base64(file_path):
     return f"data:{mime_type};base64,{encoded}"
 
 
-def _build_content_items(prompt, reference_images=None, reference_videos=None, reference_audios=None, role_mode="reference_image"):
+def _build_content_items(
+    prompt,
+    reference_images=None,
+    reference_videos=None,
+    reference_audios=None,
+    role_mode="reference_image",
+):
     prompt_text = str(prompt or "").strip()
     if not prompt_text:
         raise PluginFatalError("Prompt 不能为空")
@@ -544,40 +594,54 @@ def _build_content_items(prompt, reference_images=None, reference_videos=None, r
 
     for image in _normalize_list_or_single(reference_images):
         image_url = file_to_base64(image)
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": image_url},
-            "role": role_mode or "reference_image",
-        })
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": image_url},
+                "role": role_mode or "reference_image",
+            }
+        )
 
     for video in _normalize_list_or_single(reference_videos):
-        content.append({
-            "type": "video_url",
-            "video_url": {"url": str(video)},
-            "role": "reference_video",
-        })
+        content.append(
+            {
+                "type": "video_url",
+                "video_url": {"url": str(video)},
+                "role": "reference_video",
+            }
+        )
 
     for audio in _normalize_list_or_single(reference_audios):
-        content.append({
-            "type": "audio_url",
-            "audio_url": {"url": str(audio)},
-            "role": "reference_audio",
-        })
+        content.append(
+            {
+                "type": "audio_url",
+                "audio_url": {"url": str(audio)},
+                "role": "reference_audio",
+            }
+        )
 
     return content
 
 
-def _build_create_payload(params, prompt, reference_images=None, reference_videos=None, reference_audios=None):
+def _build_create_payload(
+    params, prompt, reference_images=None, reference_videos=None, reference_audios=None
+):
     payload = {
         "model": params["model"],
-        "content": _build_content_items(prompt, reference_images, reference_videos, reference_audios),
+        "content": _build_content_items(
+            prompt, reference_images, reference_videos, reference_audios
+        ),
         "generate_audio": bool(params["generate_audio"]),
         "resolution": params["resolution"],
         "ratio": params["ratio"],
         "duration": int(params["duration"]),
     }
 
-    has_media = bool(_normalize_list_or_single(reference_images) or _normalize_list_or_single(reference_videos) or _normalize_list_or_single(reference_audios))
+    has_media = bool(
+        _normalize_list_or_single(reference_images)
+        or _normalize_list_or_single(reference_videos)
+        or _normalize_list_or_single(reference_audios)
+    )
     if params.get("web_search") and not has_media:
         payload["tools"] = [{"type": "web_search"}]
 
@@ -586,7 +650,12 @@ def _build_create_payload(params, prompt, reference_images=None, reference_video
 
 def _create_task(api_key, base_url, payload, timeout):
     endpoint = _normalize_base_url(base_url)
-    _log_event("create_task.request", endpoint=endpoint, timeout=timeout, api_key=_mask_api_key(api_key))
+    _log_event(
+        "create_task.request",
+        endpoint=endpoint,
+        timeout=timeout,
+        api_key=_mask_api_key(api_key),
+    )
     response = requests.post(
         endpoint,
         headers=_build_auth_headers(api_key, include_content_type=True),
@@ -609,7 +678,14 @@ def _create_task(api_key, base_url, payload, timeout):
 
 def _normalize_task_status(raw_status):
     status = str(raw_status or "").strip().lower()
-    if status in {"running", "processing", "pending", "queued", "submitted", "in_progress"}:
+    if status in {
+        "running",
+        "processing",
+        "pending",
+        "queued",
+        "submitted",
+        "in_progress",
+    }:
         return "running"
     if status in {"completed", "succeeded", "success"}:
         return "completed"
@@ -630,7 +706,15 @@ def _extract_video_url_from_status(task_data):
     return task_data.get("video_url") or task_data.get("url")
 
 
-def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_interval, progress_callback=None):
+def _poll_task_status(
+    api_key,
+    base_url,
+    task_id,
+    timeout,
+    max_attempts,
+    poll_interval,
+    progress_callback=None,
+):
     endpoint = f"{_normalize_base_url(base_url)}/{task_id}"
     headers = _build_auth_headers(api_key, include_content_type=True)
     previous_status = None
@@ -646,7 +730,9 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
 
         status = _normalize_task_status(data.get("status"))
         if status != previous_status:
-            _log_event("poll_task.status", task_id=task_id, status=status, attempt=attempt)
+            _log_event(
+                "poll_task.status", task_id=task_id, status=status, attempt=attempt
+            )
             previous_status = status
         if status == "running":
             if progress_callback:
@@ -717,7 +803,9 @@ def _sanitize_params(raw_params=None):
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
 
-    pixel_width, pixel_height = _get_physical_pixels(params["resolution"], params["ratio"])
+    pixel_width, pixel_height = _get_physical_pixels(
+        params["resolution"], params["ratio"]
+    )
     params["pixel_width"] = pixel_width
     params["pixel_height"] = pixel_height
 
@@ -728,8 +816,13 @@ def _sanitize_params(raw_params=None):
 
 def _normalize_polling_config(params):
     timeout = int(params.get("timeout", DEFAULT_TIMEOUT) or DEFAULT_TIMEOUT)
-    max_attempts = int(params.get("max_poll_attempts", DEFAULT_MAX_POLL_ATTEMPTS) or DEFAULT_MAX_POLL_ATTEMPTS)
-    poll_interval = int(params.get("poll_interval", DEFAULT_POLL_INTERVAL) or DEFAULT_POLL_INTERVAL)
+    max_attempts = int(
+        params.get("max_poll_attempts", DEFAULT_MAX_POLL_ATTEMPTS)
+        or DEFAULT_MAX_POLL_ATTEMPTS
+    )
+    poll_interval = int(
+        params.get("poll_interval", DEFAULT_POLL_INTERVAL) or DEFAULT_POLL_INTERVAL
+    )
     return {
         "timeout": max(timeout, 30),
         "max_poll_attempts": max(max_attempts, 1),
@@ -746,7 +839,14 @@ def _normalize_terminal_status(status, error=None):
     return "failed"
 
 
-def _build_orchestration_result(task_id=None, status="failed", output_path=None, video_url=None, error=None, meta=None):
+def _build_orchestration_result(
+    task_id=None,
+    status="failed",
+    output_path=None,
+    video_url=None,
+    error=None,
+    meta=None,
+):
     error_text = None
     if error:
         if isinstance(error, PluginFatalError):
@@ -802,17 +902,19 @@ def _run_seedance_orchestration(context):
         )
         progress_callback("参数校验完成")
 
-        task_log_id = _insert_task_log({
-            "api_task_id": None,
-            "model_name": params.get("model"),
-            "model_display": params.get("model"),
-            "prompt": str(prompt or "")[:500],
-            "aspect_ratio": params.get("ratio"),
-            "duration": str(params.get("duration")),
-            "generation_mode": "zlhub_seedance",
-            "status": "running",
-            "metadata": {"polling": polling},
-        })
+        task_log_id = _insert_task_log(
+            {
+                "api_task_id": None,
+                "model_name": params.get("model"),
+                "model_display": params.get("model"),
+                "prompt": str(prompt or "")[:500],
+                "aspect_ratio": params.get("ratio"),
+                "duration": str(params.get("duration")),
+                "generation_mode": "zlhub_seedance",
+                "status": "running",
+                "metadata": {"polling": polling},
+            }
+        )
 
         payload = _build_create_payload(
             params=params,
@@ -855,7 +957,9 @@ def _run_seedance_orchestration(context):
             progress_callback=progress_callback,
         )
 
-        final_output_path = context.get("output_path") or _default_output_path(output_dir, viewer_index, task_id)
+        final_output_path = context.get("output_path") or _default_output_path(
+            output_dir, viewer_index, task_id
+        )
         progress_callback("下载中")
 
         downloaded_path = _download_video(
@@ -868,7 +972,13 @@ def _run_seedance_orchestration(context):
         )
         progress_callback("完成")
         _log_event("workflow.success", task_id=task_id, output_path=downloaded_path)
-        _update_task_log(task_log_id, status="success", video_url=video_url, local_path=downloaded_path, error=None)
+        _update_task_log(
+            task_log_id,
+            status="success",
+            video_url=video_url,
+            local_path=downloaded_path,
+            error=None,
+        )
 
         return _build_orchestration_result(
             task_id=task_id,
@@ -879,11 +989,15 @@ def _run_seedance_orchestration(context):
             meta={"polling": polling},
         )
     except Exception as exc:
-        wrapped_error = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
+        wrapped_error = (
+            exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
+        )
         progress_callback("失败")
         _log_event("workflow.failed", task_id=task_id, error=str(wrapped_error))
         status = "download_failed" if "下载视频失败" in str(wrapped_error) else "failed"
-        _update_task_log(task_log_id, status=status, video_url=video_url, error=str(wrapped_error))
+        _update_task_log(
+            task_log_id, status=status, video_url=video_url, error=str(wrapped_error)
+        )
         return _build_orchestration_result(
             task_id=task_id,
             status="failed",
@@ -978,7 +1092,9 @@ def handle_action(action, data=None):
         conn = _db_conn()
         try:
             for task_id in task_ids:
-                row = conn.execute("SELECT * FROM video_task_logs WHERE id = ?", (int(task_id),)).fetchone()
+                row = conn.execute(
+                    "SELECT * FROM video_task_logs WHERE id = ?", (int(task_id),)
+                ).fetchone()
                 if row:
                     rows.append(dict(row))
         finally:
