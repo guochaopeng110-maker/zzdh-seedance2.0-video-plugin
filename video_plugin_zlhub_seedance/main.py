@@ -34,6 +34,7 @@ plugin_dir = Path(__file__).parent
 _TASK_LOG_DB_PATH = plugin_dir / "video_task_logs.db"
 _MANUAL_DOWNLOAD_DIR = plugin_dir / "downloads"
 _FILE_LOG_PATH = plugin_dir / "debug_runtime.log"
+_REQUEST_PAYLOAD_DIR = plugin_dir / "request_payloads"
 _log_buffer = collections.deque(maxlen=2000)
 _log_index = 0
 _log_lock = threading.Lock()
@@ -301,6 +302,55 @@ def _log_event(event, **fields):
     print(text)
     _append_live_log("INFO", text)
     _append_file_log("INFO", text)
+
+
+def _truncate_value(value, max_len=1000):
+    text = str(value or "")
+    if len(text) <= int(max_len):
+        return text
+    return f"{text[:int(max_len)]}...(truncated, total={len(text)})"
+
+
+def _build_payload_log_snapshot(payload):
+    if isinstance(payload, dict):
+        result = {}
+        for key, value in payload.items():
+            if key == "content" and isinstance(value, list):
+                items = []
+                for item in value:
+                    if isinstance(item, dict):
+                        item_copy = dict(item)
+                        if item_copy.get("type") == "text" and isinstance(item_copy.get("text"), str):
+                            item_copy["text"] = _truncate_value(item_copy.get("text"), max_len=1000)
+                        if item_copy.get("type") in {"image_url", "video_url", "audio_url"}:
+                            media_field = item_copy.get(item_copy.get("type"))
+                            if isinstance(media_field, dict) and isinstance(media_field.get("url"), str):
+                                media_field = dict(media_field)
+                                media_field["url"] = _truncate_value(media_field.get("url"), max_len=400)
+                                item_copy[item_copy.get("type")] = media_field
+                        items.append(item_copy)
+                    else:
+                        items.append(item)
+                result[key] = items
+                continue
+
+            if isinstance(value, str):
+                result[key] = _truncate_value(value, max_len=200)
+                continue
+
+            result[key] = value
+        return result
+    return payload
+
+
+def _persist_request_payload(payload, task_id=None):
+    _REQUEST_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    suffix = _safe_filename(task_id) if task_id else "pending"
+    file_path = _REQUEST_PAYLOAD_DIR / f"request_payload_{stamp}_{suffix}.json"
+    with open(file_path, "w", encoding="utf-8") as fw:
+        fw.write(json.dumps(payload or {}, ensure_ascii=False, indent=2))
+    return str(file_path)
 
 
 def _safe_progress_callback(progress_callback):
@@ -770,6 +820,24 @@ def _run_seedance_orchestration(context):
             reference_images=reference_images,
             reference_videos=reference_videos,
             reference_audios=reference_audios,
+        )
+        payload_snapshot = _build_payload_log_snapshot(payload)
+        payload_file = _persist_request_payload(payload)
+        _log_event(
+            "create_task.payload",
+            payload=payload_snapshot,
+            payload_file=payload_file,
+        )
+        _update_task_log(
+            task_log_id,
+            metadata=json.dumps(
+                {
+                    "polling": polling,
+                    "request_payload": payload_snapshot,
+                    "request_payload_file": payload_file,
+                },
+                ensure_ascii=False,
+            ),
         )
 
         task_id, _ = _create_task(api_key, base_url, payload, polling["timeout"])
