@@ -63,6 +63,6 @@ progress:
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
-| 260403-feb | 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染 | 2026-04-03 | pending | Verified | [260403-feb-readme-faq-docs-images-logs-windows-png-](./quick/260403-feb-readme-faq-docs-images-logs-windows-png-/) |
+| 260403-feb | 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染 | 2026-04-03 | fac810e | Verified | [260403-feb-readme-faq-docs-images-logs-windows-png-](./quick/260403-feb-readme-faq-docs-images-logs-windows-png-/) |
 
 Last activity: 2026-04-03 - Completed quick task 260403-feb: 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染
