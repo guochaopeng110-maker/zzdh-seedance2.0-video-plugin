@@ -918,30 +918,6 @@ def _run_seedance_orchestration(context):
     viewer_index = context.get("viewer_index", 0)
     prompt_text = str(prompt or "")
 
-    # --- 素材审核集成逻辑 ---
-    audited_images = reference_images
-    if params.get("video_style") == "仿真人风格" and reference_images:
-        progress_callback("正在进行人像素材审核...")
-        _log_event("workflow.audit_trigger", style="仿真人风格")
-        
-        # 转换为 Base64 列表
-        raw_images = _normalize_list_or_single(reference_images)
-        b64_images = [file_to_base64(img) for img in raw_images]
-        
-        # 调用审核接口
-        asset_urls = _call_material_audit_api(
-            params.get("audit_user_id"),
-            params.get("audit_aes_key"),
-            b64_images
-        )
-        
-        if asset_urls:
-            audited_images = asset_urls
-            _log_event("workflow.audit_completed", asset_urls=asset_urls)
-        else:
-            _log_event("workflow.audit_failed", reason="未获取到 Asset URL")
-            raise PluginFatalError("素材审核未能返回有效的资源链接")
-
     task_id = None
     video_url = None
     task_log_id = None
@@ -956,6 +932,30 @@ def _run_seedance_orchestration(context):
             has_reference_audios=bool(reference_audios),
         )
         progress_callback("参数校验完成")
+
+        # --- 素材审核集成逻辑 ---
+        audited_images = reference_images
+        if params.get("video_style") == "仿真人风格" and reference_images:
+            progress_callback("正在进行人像素材审核...")
+            _log_event("workflow.audit_trigger", style="仿真人风格")
+            
+            # 转换为 Base64 列表
+            raw_images = _normalize_list_or_single(reference_images)
+            b64_images = [file_to_base64(img) for img in raw_images]
+            
+            # 调用审核接口
+            asset_urls = _call_material_audit_api(
+                params.get("audit_user_id"),
+                params.get("audit_aes_key"),
+                b64_images
+            )
+            
+            if asset_urls:
+                audited_images = asset_urls
+                _log_event("workflow.audit_completed", asset_urls=asset_urls)
+            else:
+                _log_event("workflow.audit_failed", reason="未获取到 Asset URL")
+                raise PluginFatalError("素材审核未能返回有效的资源链接")
 
         task_log_id = _insert_task_log(
             {
