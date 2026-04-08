@@ -53,6 +53,34 @@ class PluginFatalError(Exception):
 
 _PLUGIN_FILE = __file__
 
+class AuditAESCipher:
+    """素材审核接口专用的 AES-256-ECB-PKCS7 加解密类"""
+    def __init__(self, key_hex):
+        try:
+            self.key = bytes.fromhex(key_hex)
+            if len(self.key) != 32:
+                raise ValueError("AES Key 长度必须为 32 字节 (64 位 hex)")
+        except Exception as e:
+            raise PluginFatalError(f"AES Key 格式错误: {str(e)}")
+        self.backend = default_backend()
+
+    def encrypt(self, plaintext):
+        padder = padding.PKCS7(128).padder()
+        padded_data = padder.update(plaintext.encode("utf-8")) + padder.finalize()
+        cipher = Cipher(algorithms.AES(self.key), modes.ECB(), backend=self.backend)
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+        return base64.b64encode(ciphertext).decode("utf-8")
+
+    def decrypt(self, ciphertext_b64):
+        ciphertext = base64.b64decode(ciphertext_b64)
+        cipher = Cipher(algorithms.AES(self.key), modes.ECB(), backend=self.backend)
+        decryptor = cipher.decryptor()
+        padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+        unpadder = padding.PKCS7(128).unpadder()
+        data = unpadder.update(padded_data) + unpadder.finalize()
+        return data.decode("utf-8")
+
 # 配置选项
 _BASE_URL_OPTIONS = [
     (
@@ -802,6 +830,9 @@ def _sanitize_params(raw_params=None):
     params["duration"] = _normalize_duration(params.get("duration"))
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
+    params["video_style"] = str(params.get("video_style", "其他风格"))
+    params["audit_user_id"] = str(params.get("audit_user_id", "")).strip()
+    params["audit_aes_key"] = str(params.get("audit_aes_key", "")).strip()
 
     pixel_width, pixel_height = _get_physical_pixels(
         params["resolution"], params["ratio"]
@@ -887,6 +918,30 @@ def _run_seedance_orchestration(context):
     viewer_index = context.get("viewer_index", 0)
     prompt_text = str(prompt or "")
 
+    # --- 素材审核集成逻辑 ---
+    audited_images = reference_images
+    if params.get("video_style") == "仿真人风格" and reference_images:
+        progress_callback("正在进行人像素材审核...")
+        _log_event("workflow.audit_trigger", style="仿真人风格")
+        
+        # 转换为 Base64 列表
+        raw_images = _normalize_list_or_single(reference_images)
+        b64_images = [file_to_base64(img) for img in raw_images]
+        
+        # 调用审核接口
+        asset_urls = _call_material_audit_api(
+            params.get("audit_user_id"),
+            params.get("audit_aes_key"),
+            b64_images
+        )
+        
+        if asset_urls:
+            audited_images = asset_urls
+            _log_event("workflow.audit_completed", asset_urls=asset_urls)
+        else:
+            _log_event("workflow.audit_failed", reason="未获取到 Asset URL")
+            raise PluginFatalError("素材审核未能返回有效的资源链接")
+
     task_id = None
     video_url = None
     task_log_id = None
@@ -912,14 +967,18 @@ def _run_seedance_orchestration(context):
                 "duration": str(params.get("duration")),
                 "generation_mode": "zlhub_seedance",
                 "status": "running",
-                "metadata": {"polling": polling},
+                "metadata": {
+                    "polling": polling,
+                    "video_style": params.get("video_style"),
+                    "audited": bool(params.get("video_style") == "仿真人风格")
+                },
             }
         )
 
         payload = _build_create_payload(
             params=params,
             prompt=prompt,
-            reference_images=reference_images,
+            reference_images=audited_images,
             reference_videos=reference_videos,
             reference_audios=reference_audios,
         )
@@ -1097,6 +1156,38 @@ def handle_action(action, data=None):
                 ).fetchone()
                 if row:
                     rows.append(dict(row))
+        finally:
+            conn.close()
+        results = [_manual_download_video(row) for row in rows]
+        return {"ok": True, "results": results}
+    return {"ok": False, "error": f"未知动作: {action}"}
+
+
+_init_task_log_db()
+_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
+
+
+if __name__ == "__main__":
+    required_funcs = [
+        "_build_auth_headers",
+        "_build_create_payload",
+        "_create_task",
+        "_poll_task_status",
+        "_download_video",
+        "_normalize_polling_config",
+        "_normalize_terminal_status",
+        "_build_orchestration_result",
+        "_run_seedance_orchestration",
+        "_map_orchestration_to_plugin_output",
+        "run_seedance_workflow",
+        "run_seedance_client",
+        "handle_action",
+    ]
+    missing = [name for name in required_funcs if not callable(globals().get(name))]
+    if missing:
+        raise SystemExit(f"smoke check failed, missing callables: {missing}")
+    print("smoke check passed")
+      rows.append(dict(row))
         finally:
             conn.close()
         results = [_manual_download_video(row) for row in rows]

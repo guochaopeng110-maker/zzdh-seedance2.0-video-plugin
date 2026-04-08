@@ -107,6 +107,15 @@
             </div>
         </div>
         <div class="form-row">
+            <label class="form-label">视频风格</label>
+            <div class="form-control">
+                <select id="videoStyleSelect">
+                    <option value="其他风格" selected>其他风格 (默认)</option>
+                    <option value="仿真人风格">仿真人风格 (触发审核)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
             <label class="form-label">分辨率</label>
             <div class="form-control">
                 <select id="resolutionSelect">
@@ -351,8 +360,11 @@
 
             PluginSDK.onReady(function (params) {
                 if (params.api_key) apiKeyInput.value = params.api_key;
+                if (params.audit_user_id) auditUserIdInput.value = params.audit_user_id;
+                if (params.audit_aes_key) auditAesKeyInput.value = params.audit_aes_key;
                 if (params.base_url) baseUrlSelect.value = params.base_url;
                 if (params.model) modelSelect.value = params.model;
+                if (params.video_style) videoStyleSelect.value = params.video_style;
                 if (params.resolution)
                     resolutionSelect.value = params.resolution;
                 if (params.ratio) ratioSelect.value = params.ratio;
@@ -363,6 +375,17 @@
                 if (params.web_search != null)
                     webSearchSelect.value = String(params.web_search);
                 if (params.timeout) timeoutInput.value = params.timeout;
+                if (params.max_poll_attempts)
+                    maxPollAttemptsInput.value = params.max_poll_attempts;
+                if (params.poll_interval)
+                    pollIntervalInput.value = params.poll_interval;
+                if (params.retry_count != null)
+                    retryCountInput.value = params.retry_count;
+            });
+        </script>
+    </body>
+</html>
+ timeoutInput.value = params.timeout;
                 if (params.max_poll_attempts)
                     maxPollAttemptsInput.value = params.max_poll_attempts;
                 if (params.poll_interval)

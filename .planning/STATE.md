@@ -32,23 +32,21 @@ progress:
 
 **总体进度:** 80%
 
-## 当前激活阶段: 5 — UI 与集成
+## 当前激活阶段: 7 — 素材审核集成
 
-**目标:** 完成宿主入口接线、错误处理与可观测性集成
+**目标:** 对参考图片进行合规性审核，确保包含人像的图片在使用前通过安全检测。
 
 **需求:**
 
-- [x] ERR-01: 统一错误前缀映射
-- [x] ERR-02: 实现进度回调对宿主更新
-- [x] ERR-03: 增加关键生命周期日志
-- [x] CONT-03: 实现 generate(context) 宿主入口
+- [ ] AUDIT-01: UI 新增“视频风格”选择（仿真人/其他）。
+- [ ] AUDIT-02: 实现 AES-256-ECB 加解密工具类。
+- [ ] AUDIT-03: 集成素材审核工作流，将 URL 转换为 Asset 资源。
 
 **成功标准:**
 
-- [ ] 面向用户错误统一以 `PLUGIN_ERROR:::` 开头（待宿主联调确认）。
-- [ ] 宿主可收到生成过程进度更新（待宿主联调确认）。
-- [ ] 关键任务生命周期可被日志追踪（待宿主联调确认）。
-- [ ] `generate(context)` 可触发完整工作流（待宿主联调确认）。
+- [ ] UI 成功保存并加载 `video_style` 参数。
+- [ ] 选择“仿真人”时，后台自动触发审核接口。
+- [ ] 审核返回的 Asset 资源正确传递给 Seedance 视频生成接口。
 
 ---
 *最后更新：2026-04-02*
@@ -66,3 +64,4 @@ progress:
 | 260403-feb | 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染 | 2026-04-03 | fac810e | Verified | [260403-feb-readme-faq-docs-images-logs-windows-png-](./quick/260403-feb-readme-faq-docs-images-logs-windows-png-/) |
 
 Last activity: 2026-04-03 - Completed quick task 260403-feb: 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染
+ocs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染
