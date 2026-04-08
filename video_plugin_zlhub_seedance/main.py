@@ -1187,6 +1187,8 @@ if __name__ == "__main__":
     if missing:
         raise SystemExit(f"smoke check failed, missing callables: {missing}")
     print("smoke check passed")
+ SystemExit(f"smoke check failed, missing callables: {missing}")
+    print("smoke check passed")
       rows.append(dict(row))
         finally:
             conn.close()
