@@ -10,22 +10,26 @@ import json
 import mimetypes
 import os
 import sqlite3
+import sys
 import threading
 import time
 from datetime import datetime
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 
 import requests
+_CRYPTOGRAPHY_IMPORT_ERROR = None
 try:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import padding
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-except Exception:
+except Exception as exc:
     default_backend = None
     padding = None
     Cipher = None
     algorithms = None
     modes = None
+    _CRYPTOGRAPHY_IMPORT_ERROR = exc
 
 # 导入插件工具类
 try:
@@ -63,11 +67,36 @@ class PluginFatalError(Exception):
 
 _PLUGIN_FILE = __file__
 
+
+def _build_runtime_pip_install_hint(package_name):
+    python_exe = str(Path(sys.executable or "python").resolve())
+    return f'"{python_exe}" -m pip install --upgrade {package_name}'
+
+
+def _detect_cryptography_state():
+    if not all([Cipher, algorithms, modes, padding, default_backend]):
+        return {
+            "available": False,
+            "version": "",
+            "error": str(_CRYPTOGRAPHY_IMPORT_ERROR or "import failed"),
+        }
+    version = ""
+    try:
+        version = importlib_metadata.version("cryptography")
+    except Exception:
+        version = "installed"
+    return {"available": True, "version": version, "error": ""}
+
+
 class AuditAESCipher:
     """素材审核接口专用的 AES-256-ECB-PKCS7 加解密类"""
     def __init__(self, key_hex):
         if not all([Cipher, algorithms, modes, padding, default_backend]):
-            raise PluginFatalError("素材审核依赖缺失: cryptography 未安装或不可用")
+            hint = _build_runtime_pip_install_hint("cryptography")
+            raw_error = str(_CRYPTOGRAPHY_IMPORT_ERROR or "import failed")
+            raise PluginFatalError(
+                f"素材审核依赖缺失: cryptography 未安装或不可用。请在插件运行环境执行: {hint}。原始错误: {raw_error}"
+            )
         try:
             self.key = bytes.fromhex(key_hex)
             if len(self.key) != 32:
@@ -1431,7 +1460,22 @@ def handle_action(action, data=None):
 
 
 _init_task_log_db()
-_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
+_crypto_state = _detect_cryptography_state()
+_append_file_log(
+    "INFO",
+    "module.loaded "
+    f"version={_PLUGIN_VERSION} "
+    f"python={sys.executable} "
+    f"cryptography_available={_crypto_state['available']} "
+    f"cryptography_version={_crypto_state['version']}",
+)
+if not _crypto_state["available"]:
+    _append_file_log(
+        "WARN",
+        "cryptography.unavailable "
+        f"error={_crypto_state['error']} "
+        f"install_hint={_build_runtime_pip_install_hint('cryptography')}",
+    )
 
 
 if __name__ == "__main__":

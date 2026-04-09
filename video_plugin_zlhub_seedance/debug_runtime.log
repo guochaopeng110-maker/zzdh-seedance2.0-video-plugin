@@ -22,3 +22,4 @@
 [2026-04-09 12:08:29] [INFO] [ZLHubSeedance] {"ts": "2026-04-09 12:08:29", "event": "audit.success", "fields": {"review_batch_id": "review-test-only", "asset_count": 1}}
 [2026-04-09 12:08:29] [INFO] [ZLHubSeedance] {"ts": "2026-04-09 12:08:29", "event": "workflow.audit_completed", "fields": {"asset_urls": ["Asset://Asset-test-only"]}}
 [2026-04-09 12:08:29] [INFO] [ZLHubSeedance] {"ts": "2026-04-09 12:08:29", "event": "workflow.audit_test_only.success", "fields": {"asset_urls": ["Asset://Asset-test-only"]}}
+[2026-04-09 14:27:15] [INFO] module.loaded version=1.1.0 python=D:\Anaconda\python.exe cryptography_available=True cryptography_version=42.0.2
