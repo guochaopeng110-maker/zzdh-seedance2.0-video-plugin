@@ -10,26 +10,23 @@ import json
 import mimetypes
 import os
 import sqlite3
-import sys
 import threading
 import time
 from datetime import datetime
-from importlib import metadata as importlib_metadata
 from pathlib import Path
 
 import requests
-_CRYPTOGRAPHY_IMPORT_ERROR = None
+
 try:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import padding
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-except Exception as exc:
+except Exception:
     default_backend = None
     padding = None
     Cipher = None
     algorithms = None
     modes = None
-    _CRYPTOGRAPHY_IMPORT_ERROR = exc
 
 # 导入插件工具类
 try:
@@ -68,35 +65,12 @@ class PluginFatalError(Exception):
 _PLUGIN_FILE = __file__
 
 
-def _build_runtime_pip_install_hint(package_name):
-    python_exe = str(Path(sys.executable or "python").resolve())
-    return f'"{python_exe}" -m pip install --upgrade {package_name}'
-
-
-def _detect_cryptography_state():
-    if not all([Cipher, algorithms, modes, padding, default_backend]):
-        return {
-            "available": False,
-            "version": "",
-            "error": str(_CRYPTOGRAPHY_IMPORT_ERROR or "import failed"),
-        }
-    version = ""
-    try:
-        version = importlib_metadata.version("cryptography")
-    except Exception:
-        version = "installed"
-    return {"available": True, "version": version, "error": ""}
-
-
 class AuditAESCipher:
     """素材审核接口专用的 AES-256-ECB-PKCS7 加解密类"""
+
     def __init__(self, key_hex):
         if not all([Cipher, algorithms, modes, padding, default_backend]):
-            hint = _build_runtime_pip_install_hint("cryptography")
-            raw_error = str(_CRYPTOGRAPHY_IMPORT_ERROR or "import failed")
-            raise PluginFatalError(
-                f"素材审核依赖缺失: cryptography 未安装或不可用。请在插件运行环境执行: {hint}。原始错误: {raw_error}"
-            )
+            raise PluginFatalError("素材审核依赖缺失: cryptography 未安装或不可用")
         try:
             self.key = bytes.fromhex(key_hex)
             if len(self.key) != 32:
@@ -122,6 +96,7 @@ class AuditAESCipher:
         data = unpadder.update(padded_data) + unpadder.finalize()
         return data.decode("utf-8")
 
+
 # 配置选项
 _BASE_URL_OPTIONS = [
     (
@@ -132,7 +107,9 @@ _BASE_URL_OPTIONS = [
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
 _DEFAULT_AUDIT_API_URL = "http://118.196.112.236:3428/api/moderation/image"
 _AUDIT_API_URL_ENV_KEYS = ("ZLHUB_AUDIT_API_URL", "AUDIT_API_URL")
-_FIXED_AUDIT_AES_KEY = "aadbd8d9c876e70c765835dbf7dded68a8edd681d5bb81dfcede045f704b6e25"
+_FIXED_AUDIT_AES_KEY = (
+    "25ef2ee94546a00817f68d5bc2b7c6e62a5ca11dd2acdb876defdbc0c48a9944"
+)
 
 DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
@@ -454,45 +431,6 @@ def _build_payload_log_snapshot(payload):
     return payload
 
 
-def _build_log_snapshot(value, max_string_len=400, max_list_items=8, _depth=0, _max_depth=5):
-    if _depth >= int(_max_depth):
-        return f"...(truncated, max_depth={_max_depth})"
-
-    if isinstance(value, str):
-        return _truncate_value(value, max_len=max_string_len)
-
-    if isinstance(value, dict):
-        result = {}
-        for key, item in value.items():
-            result[str(key)] = _build_log_snapshot(
-                item,
-                max_string_len=max_string_len,
-                max_list_items=max_list_items,
-                _depth=_depth + 1,
-                _max_depth=_max_depth,
-            )
-        return result
-
-    if isinstance(value, (list, tuple)):
-        result = []
-        limit = max(1, int(max_list_items))
-        for item in list(value)[:limit]:
-            result.append(
-                _build_log_snapshot(
-                    item,
-                    max_string_len=max_string_len,
-                    max_list_items=max_list_items,
-                    _depth=_depth + 1,
-                    _max_depth=_max_depth,
-                )
-            )
-        if len(value) > limit:
-            result.append(f"...(truncated, total={len(value)})")
-        return result
-
-    return value
-
-
 def _persist_request_payload(payload, task_id=None):
     _REQUEST_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -741,17 +679,11 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
 
     endpoint = _resolve_audit_api_url()
     request_timeout = max(5, min(int(timeout or 30), 120))
-    request_log_payload = {
-        "user_id": request_payload.get("user_id"),
-        "encrypted_data": request_payload.get("encrypted_data"),
-        "images": image_list,
-    }
     _log_event(
         "audit.request",
         endpoint=endpoint,
         user_id=user_id,
         image_count=len(image_list),
-        request_params=_build_log_snapshot(request_log_payload),
     )
     try:
         response = requests.post(
@@ -764,14 +696,6 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
         raise PluginFatalError(f"素材审核请求失败: {exc}") from exc
 
     if response.status_code != 200:
-        _log_event(
-            "audit.response",
-            endpoint=endpoint,
-            status_code=response.status_code,
-            response_params={
-                "text": _truncate_value(response.text, max_len=1200),
-            },
-        )
         raise PluginFatalError(
             f"素材审核请求失败: HTTP {response.status_code} - {response.text}"
         )
@@ -779,21 +703,7 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
     try:
         response_json = response.json()
     except json.JSONDecodeError as exc:
-        _log_event(
-            "audit.response",
-            endpoint=endpoint,
-            status_code=response.status_code,
-            response_params={
-                "text": _truncate_value(response.text, max_len=1200),
-            },
-        )
         raise PluginFatalError("素材审核返回非 JSON 响应") from exc
-    _log_event(
-        "audit.response",
-        endpoint=endpoint,
-        status_code=response.status_code,
-        response_params=_build_log_snapshot(response_json),
-    )
 
     if not response_json.get("encrypted_data"):
         code = response_json.get("code")
@@ -806,12 +716,6 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
         decrypted_json = json.loads(decrypted)
     except Exception as exc:
         raise PluginFatalError(f"素材审核响应解密失败: {exc}") from exc
-    _log_event(
-        "audit.response.decrypted",
-        endpoint=endpoint,
-        status_code=response.status_code,
-        response_params=_build_log_snapshot(decrypted_json),
-    )
 
     if response_json.get("code") not in (None, 200):
         code = response_json.get("code")
@@ -1071,7 +975,11 @@ def _sanitize_params(raw_params=None):
     params["web_search"] = _normalize_web_search(params.get("web_search"))
     style = str(params.get("video_style", "其他风格") or "").strip()
     style_lc = style.lower()
-    if "仿真" in style or "真人" in style or style_lc in {"human", "human_style", "realistic"}:
+    if (
+        "仿真" in style
+        or "真人" in style
+        or style_lc in {"human", "human_style", "realistic"}
+    ):
         params["video_style"] = "仿真人风格"
     else:
         params["video_style"] = "其他风格"
@@ -1186,18 +1094,16 @@ def _run_seedance_orchestration(context):
             audit_triggered = True
             progress_callback("正在进行人像素材审核...")
             _log_event("workflow.audit_trigger", style="仿真人风格")
-            
+
             # 转换为 Base64 列表
             raw_images = _normalize_list_or_single(reference_images)
             b64_images = [file_to_base64(img) for img in raw_images]
-            
+
             # 调用审核接口
             asset_urls = _call_material_audit_api(
-                params.get("audit_user_id"),
-                params.get("audit_aes_key"),
-                b64_images
+                params.get("audit_user_id"), params.get("audit_aes_key"), b64_images
             )
-            
+
             if asset_urls:
                 audited_images = asset_urls
                 _log_event("workflow.audit_completed", asset_urls=asset_urls)
@@ -1460,22 +1366,7 @@ def handle_action(action, data=None):
 
 
 _init_task_log_db()
-_crypto_state = _detect_cryptography_state()
-_append_file_log(
-    "INFO",
-    "module.loaded "
-    f"version={_PLUGIN_VERSION} "
-    f"python={sys.executable} "
-    f"cryptography_available={_crypto_state['available']} "
-    f"cryptography_version={_crypto_state['version']}",
-)
-if not _crypto_state["available"]:
-    _append_file_log(
-        "WARN",
-        "cryptography.unavailable "
-        f"error={_crypto_state['error']} "
-        f"install_hint={_build_runtime_pip_install_hint('cryptography')}",
-    )
+_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
 
 
 if __name__ == "__main__":
