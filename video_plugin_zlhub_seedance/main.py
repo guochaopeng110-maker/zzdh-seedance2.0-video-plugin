@@ -16,6 +16,16 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+try:
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+except Exception:
+    default_backend = None
+    padding = None
+    Cipher = None
+    algorithms = None
+    modes = None
 
 # 导入插件工具类
 try:
@@ -56,6 +66,8 @@ _PLUGIN_FILE = __file__
 class AuditAESCipher:
     """素材审核接口专用的 AES-256-ECB-PKCS7 加解密类"""
     def __init__(self, key_hex):
+        if not all([Cipher, algorithms, modes, padding, default_backend]):
+            raise PluginFatalError("素材审核依赖缺失: cryptography 未安装或不可用")
         try:
             self.key = bytes.fromhex(key_hex)
             if len(self.key) != 32:
@@ -89,6 +101,9 @@ _BASE_URL_OPTIONS = [
     ),
 ]
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
+_DEFAULT_AUDIT_API_URL = "http://118.196.112.236:3428/api/moderation/image"
+_AUDIT_API_URL_ENV_KEYS = ("ZLHUB_AUDIT_API_URL", "AUDIT_API_URL")
+_AUDIT_AES_KEY_ENV_KEYS = ("ZLHUB_AUDIT_AES_KEY", "AUDIT_AES_KEY")
 
 DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
@@ -155,6 +170,9 @@ def _build_params_log_snapshot(params):
         "max_poll_attempts": params.get("max_poll_attempts"),
         "poll_interval": params.get("poll_interval"),
         "retry_count": params.get("retry_count"),
+        "video_style": params.get("video_style"),
+        "audit_user_id": params.get("audit_user_id"),
+        "audit_aes_key_present": bool(str(params.get("audit_aes_key", "")).strip()),
     }
 
 
@@ -452,6 +470,9 @@ def _build_default_params():
         "max_poll_attempts": DEFAULT_MAX_POLL_ATTEMPTS,
         "poll_interval": DEFAULT_POLL_INTERVAL,
         "retry_count": 3,
+        "video_style": "其他风格",
+        "audit_user_id": "",
+        "audit_aes_key": "",
     }
 
 
@@ -526,7 +547,7 @@ def _validate_image_constraints(image_path):
         return
 
     path_text = str(image_path)
-    if path_text.startswith(("http://", "https://", "data:", "asset://")):
+    if path_text.lower().startswith(("http://", "https://", "data:", "asset://")):
         return
 
     if not os.path.exists(path_text):
@@ -549,7 +570,7 @@ def _normalize_base_url(url):
 
 
 def _is_remote_or_asset(value):
-    text = str(value or "")
+    text = str(value or "").strip().lower()
     return text.startswith(("http://", "https://", "data:", "asset://"))
 
 
@@ -605,6 +626,130 @@ def file_to_base64(file_path):
 
     mime_type = _guess_mime_type(path_text)
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _env_first(keys):
+    for key in keys:
+        value = str(os.environ.get(key, "")).strip()
+        if value:
+            return value
+    return ""
+
+
+def _resolve_audit_api_url():
+    return _env_first(_AUDIT_API_URL_ENV_KEYS) or _DEFAULT_AUDIT_API_URL
+
+
+def _resolve_audit_aes_key(audit_aes_key):
+    key = str(audit_aes_key or "").strip()
+    if key:
+        return key
+    return _env_first(_AUDIT_AES_KEY_ENV_KEYS)
+
+
+def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
+    image_list = []
+    for image in _normalize_list_or_single(images):
+        item = str(image or "").strip()
+        if item:
+            image_list.append(item)
+    if not image_list:
+        raise PluginFatalError("素材审核失败: images 不能为空")
+
+    try:
+        user_id = int(str(audit_user_id or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise PluginFatalError("素材审核失败: audit_user_id 必须为数字") from exc
+    if user_id <= 0:
+        raise PluginFatalError("素材审核失败: audit_user_id 必须大于 0")
+
+    aes_key = _resolve_audit_aes_key(audit_aes_key)
+    if not aes_key:
+        env_names = " / ".join(_AUDIT_AES_KEY_ENV_KEYS)
+        raise PluginFatalError(
+            f"素材审核失败: audit_aes_key 未设置（可在 UI 输入，或使用环境变量 {env_names}）"
+        )
+
+    cipher = AuditAESCipher(aes_key)
+    payload_plain = json.dumps(
+        {"images": image_list}, ensure_ascii=False, separators=(",", ":")
+    )
+    request_payload = {
+        "user_id": user_id,
+        "encrypted_data": cipher.encrypt(payload_plain),
+    }
+
+    endpoint = _resolve_audit_api_url()
+    request_timeout = max(5, min(int(timeout or 30), 120))
+    _log_event(
+        "audit.request",
+        endpoint=endpoint,
+        user_id=user_id,
+        image_count=len(image_list),
+    )
+    try:
+        response = requests.post(
+            endpoint,
+            headers={"Content-Type": "application/json"},
+            json=request_payload,
+            timeout=request_timeout,
+        )
+    except requests.RequestException as exc:
+        raise PluginFatalError(f"素材审核请求失败: {exc}") from exc
+
+    if response.status_code != 200:
+        raise PluginFatalError(
+            f"素材审核请求失败: HTTP {response.status_code} - {response.text}"
+        )
+
+    try:
+        response_json = response.json()
+    except json.JSONDecodeError as exc:
+        raise PluginFatalError("素材审核返回非 JSON 响应") from exc
+
+    if not response_json.get("encrypted_data"):
+        code = response_json.get("code")
+        message = response_json.get("message") or response_json.get("msg") or "未知错误"
+        suffix = f" (code={code})" if code is not None else ""
+        raise PluginFatalError(f"素材审核失败: {message}{suffix}")
+
+    try:
+        decrypted = cipher.decrypt(response_json["encrypted_data"])
+        decrypted_json = json.loads(decrypted)
+    except Exception as exc:
+        raise PluginFatalError(f"素材审核响应解密失败: {exc}") from exc
+
+    if response_json.get("code") not in (None, 200):
+        code = response_json.get("code")
+        message = response_json.get("message") or "未知错误"
+        raise PluginFatalError(f"素材审核失败: {message} (code={code})")
+
+    items = decrypted_json.get("items")
+    if not isinstance(items, list):
+        raise PluginFatalError("素材审核失败: 响应缺少 items")
+
+    asset_urls = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        asset_url = str(item.get("asset_url") or "").strip()
+        if not asset_url:
+            continue
+        if not asset_url.lower().startswith("asset://"):
+            raise PluginFatalError(f"素材审核失败: 非法资源地址 {asset_url}")
+        asset_urls.append(asset_url)
+
+    if len(asset_urls) < len(image_list):
+        raise PluginFatalError(
+            f"素材审核失败: 返回资源数不足 ({len(asset_urls)}/{len(image_list)})"
+        )
+
+    _log_event(
+        "audit.success",
+        review_batch_id=decrypted_json.get("review_batch_id"),
+        asset_count=len(asset_urls),
+    )
+    return asset_urls
 
 
 def _build_content_items(
@@ -830,7 +975,8 @@ def _sanitize_params(raw_params=None):
     params["duration"] = _normalize_duration(params.get("duration"))
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
-    params["video_style"] = str(params.get("video_style", "其他风格"))
+    style = str(params.get("video_style", "其他风格") or "").strip()
+    params["video_style"] = style if style in {"仿真人风格", "其他风格"} else "其他风格"
     params["audit_user_id"] = str(params.get("audit_user_id", "")).strip()
     params["audit_aes_key"] = str(params.get("audit_aes_key", "")).strip()
 
@@ -994,6 +1140,11 @@ def _run_seedance_orchestration(context):
             metadata=json.dumps(
                 {
                     "polling": polling,
+                    "video_style": params.get("video_style"),
+                    "audited": bool(
+                        params.get("video_style") == "仿真人风格"
+                        and _normalize_list_or_single(reference_images)
+                    ),
                     "request_payload": payload_snapshot,
                     "request_payload_file": payload_file,
                 },

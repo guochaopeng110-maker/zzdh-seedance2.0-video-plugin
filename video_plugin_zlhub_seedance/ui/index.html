@@ -59,7 +59,7 @@
     <body>
         <h3>TDu&ZLHub Seedance 视频生成插件V1.1.0</h3>
         <p class="hint-text">
-            对接 ZLHub 中转平台，使用Seedance 2.0 模型生成视频>
+            对接 ZLHub 中转平台，使用 Seedance 2.0 模型生成视频
         </p>
         <hr />
 
@@ -76,6 +76,31 @@
                         &#128065;
                     </button>
                 </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <label class="form-label">Audit User ID</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="auditUserIdInput"
+                    min="1"
+                    step="1"
+                    placeholder="审核用户ID（仅仿真人风格需要）"
+                />
+            </div>
+        </div>
+        <div class="form-row">
+            <label class="form-label">Audit AES Key（可选）</label>
+            <div class="form-control">
+                <input
+                    type="password"
+                    id="auditAesKeyInput"
+                    placeholder="64位HEX，留空则读取环境变量 AUDIT_AES_KEY"
+                />
+            </div>
+            <div class="hint-text">
+                建议通过环境变量注入 AES Key。仅在“仿真人风格”审核链路中使用。
             </div>
         </div>
 
@@ -100,7 +125,7 @@
                     <option value="doubao-seedance-2.0" selected>
                         doubao-seedance-2.0
                     </option>
-                    <option value="doubao-seedance-2.0" selected>
+                    <option value="doubao-seedance-2.0-fast">
                         doubao-seedance-2.0-fast
                     </option>
                 </select>
@@ -262,6 +287,9 @@
                 "generateAudioSelect",
             );
             var webSearchSelect = document.getElementById("webSearchSelect");
+            var videoStyleSelect = document.getElementById("videoStyleSelect");
+            var auditUserIdInput = document.getElementById("auditUserIdInput");
+            var auditAesKeyInput = document.getElementById("auditAesKeyInput");
             var timeoutInput = document.getElementById("timeoutInput");
             var baseUrlSelect = document.getElementById("baseUrlSelect");
             var modelSelect = document.getElementById("modelSelect");
@@ -287,6 +315,18 @@
             apiKeyInput.addEventListener("change", function () {
                 PluginSDK.saveParam("api_key", apiKeyInput.value);
             });
+            auditUserIdInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "audit_user_id",
+                    (auditUserIdInput.value || "").trim(),
+                );
+            });
+            auditAesKeyInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "audit_aes_key",
+                    (auditAesKeyInput.value || "").trim(),
+                );
+            });
 
             baseUrlSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("base_url", baseUrlSelect.value);
@@ -294,6 +334,9 @@
 
             modelSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("model", modelSelect.value);
+            });
+            videoStyleSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("video_style", videoStyleSelect.value);
             });
 
             resolutionSelect.addEventListener("change", function () {
@@ -363,7 +406,7 @@
                 if (params.audit_user_id)
                     auditUserIdInput.value = params.audit_user_id;
                 if (params.audit_aes_key)
-                    auditAesKeyput.value = params.audit_aes_key;
+                    auditAesKeyInput.value = params.audit_aes_key;
                 if (params.base_url) baseUrlSelect.value = params.base_url;
                 if (params.model) modelSelect.value = params.model;
                 if (params.video_style)

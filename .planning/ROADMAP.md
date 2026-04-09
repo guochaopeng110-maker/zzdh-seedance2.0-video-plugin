@@ -120,5 +120,15 @@ Plans:
 2. 选择“仿真人”时，后台自动触发审核接口。
 3. 审核返回的 Asset 资源正确传递给 Seedance 视频生成接口。
 
+### Phase 7.1: 修复审核参数链路与插件加载问题 (INSERTED)
+
+**Goal:** 修复审核参数在 UI 与后端之间的传递链路，消除插件加载时的前端引用错误与 Python 语法阻断问题，确保审核分支和非审核分支都可稳定运行。
+**Requirements**: CONT-05, ORCH-01, ERR-01
+**Depends on:** Phase 7
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 07.1-01: Fix audit params pipeline and plugin load stability
+
 ---
 *最后更新：2026-04-08*
