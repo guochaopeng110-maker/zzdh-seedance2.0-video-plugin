@@ -425,6 +425,45 @@ def _build_payload_log_snapshot(payload):
     return payload
 
 
+def _build_log_snapshot(value, max_string_len=400, max_list_items=8, _depth=0, _max_depth=5):
+    if _depth >= int(_max_depth):
+        return f"...(truncated, max_depth={_max_depth})"
+
+    if isinstance(value, str):
+        return _truncate_value(value, max_len=max_string_len)
+
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            result[str(key)] = _build_log_snapshot(
+                item,
+                max_string_len=max_string_len,
+                max_list_items=max_list_items,
+                _depth=_depth + 1,
+                _max_depth=_max_depth,
+            )
+        return result
+
+    if isinstance(value, (list, tuple)):
+        result = []
+        limit = max(1, int(max_list_items))
+        for item in list(value)[:limit]:
+            result.append(
+                _build_log_snapshot(
+                    item,
+                    max_string_len=max_string_len,
+                    max_list_items=max_list_items,
+                    _depth=_depth + 1,
+                    _max_depth=_max_depth,
+                )
+            )
+        if len(value) > limit:
+            result.append(f"...(truncated, total={len(value)})")
+        return result
+
+    return value
+
+
 def _persist_request_payload(payload, task_id=None):
     _REQUEST_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -673,11 +712,17 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
 
     endpoint = _resolve_audit_api_url()
     request_timeout = max(5, min(int(timeout or 30), 120))
+    request_log_payload = {
+        "user_id": request_payload.get("user_id"),
+        "encrypted_data": request_payload.get("encrypted_data"),
+        "images": image_list,
+    }
     _log_event(
         "audit.request",
         endpoint=endpoint,
         user_id=user_id,
         image_count=len(image_list),
+        request_params=_build_log_snapshot(request_log_payload),
     )
     try:
         response = requests.post(
@@ -690,6 +735,14 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
         raise PluginFatalError(f"素材审核请求失败: {exc}") from exc
 
     if response.status_code != 200:
+        _log_event(
+            "audit.response",
+            endpoint=endpoint,
+            status_code=response.status_code,
+            response_params={
+                "text": _truncate_value(response.text, max_len=1200),
+            },
+        )
         raise PluginFatalError(
             f"素材审核请求失败: HTTP {response.status_code} - {response.text}"
         )
@@ -697,7 +750,21 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
     try:
         response_json = response.json()
     except json.JSONDecodeError as exc:
+        _log_event(
+            "audit.response",
+            endpoint=endpoint,
+            status_code=response.status_code,
+            response_params={
+                "text": _truncate_value(response.text, max_len=1200),
+            },
+        )
         raise PluginFatalError("素材审核返回非 JSON 响应") from exc
+    _log_event(
+        "audit.response",
+        endpoint=endpoint,
+        status_code=response.status_code,
+        response_params=_build_log_snapshot(response_json),
+    )
 
     if not response_json.get("encrypted_data"):
         code = response_json.get("code")
@@ -710,6 +777,12 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
         decrypted_json = json.loads(decrypted)
     except Exception as exc:
         raise PluginFatalError(f"素材审核响应解密失败: {exc}") from exc
+    _log_event(
+        "audit.response.decrypted",
+        endpoint=endpoint,
+        status_code=response.status_code,
+        response_params=_build_log_snapshot(decrypted_json),
+    )
 
     if response_json.get("code") not in (None, 200):
         code = response_json.get("code")
