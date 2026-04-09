@@ -91,16 +91,16 @@
             </div>
         </div>
         <div class="form-row">
-            <label class="form-label">Audit AES Key（可选）</label>
+            <label class="form-label">审核密钥策略</label>
             <div class="form-control">
                 <input
-                    type="password"
-                    id="auditAesKeyInput"
-                    placeholder="64位HEX，留空则读取环境变量 AUDIT_AES_KEY"
+                    type="text"
+                    value="内置固定密钥（无需填写）"
+                    disabled
                 />
             </div>
             <div class="hint-text">
-                建议通过环境变量注入 AES Key。仅在“仿真人风格”审核链路中使用。
+                审核接口已改为使用插件内固定密钥。
             </div>
         </div>
 
@@ -137,6 +137,15 @@
                 <select id="videoStyleSelect">
                     <option value="其他风格" selected>其他风格 (默认)</option>
                     <option value="仿真人风格">仿真人风格 (触发审核)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <label class="form-label">仅测试审核接口</label>
+            <div class="form-control">
+                <select id="auditTestOnlySelect">
+                    <option value="false" selected>关闭（正常生成视频）</option>
+                    <option value="true">开启（只测审核，不调生成接口）</option>
                 </select>
             </div>
         </div>
@@ -288,8 +297,9 @@
             );
             var webSearchSelect = document.getElementById("webSearchSelect");
             var videoStyleSelect = document.getElementById("videoStyleSelect");
+            var auditTestOnlySelect =
+                document.getElementById("auditTestOnlySelect");
             var auditUserIdInput = document.getElementById("auditUserIdInput");
-            var auditAesKeyInput = document.getElementById("auditAesKeyInput");
             var timeoutInput = document.getElementById("timeoutInput");
             var baseUrlSelect = document.getElementById("baseUrlSelect");
             var modelSelect = document.getElementById("modelSelect");
@@ -321,12 +331,6 @@
                     (auditUserIdInput.value || "").trim(),
                 );
             });
-            auditAesKeyInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "audit_aes_key",
-                    (auditAesKeyInput.value || "").trim(),
-                );
-            });
 
             baseUrlSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("base_url", baseUrlSelect.value);
@@ -337,6 +341,12 @@
             });
             videoStyleSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("video_style", videoStyleSelect.value);
+            });
+            auditTestOnlySelect.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "audit_test_only",
+                    auditTestOnlySelect.value === "true",
+                );
             });
 
             resolutionSelect.addEventListener("change", function () {
@@ -405,12 +415,12 @@
                 if (params.api_key) apiKeyInput.value = params.api_key;
                 if (params.audit_user_id)
                     auditUserIdInput.value = params.audit_user_id;
-                if (params.audit_aes_key)
-                    auditAesKeyInput.value = params.audit_aes_key;
                 if (params.base_url) baseUrlSelect.value = params.base_url;
                 if (params.model) modelSelect.value = params.model;
                 if (params.video_style)
                     videoStyleSelect.value = params.video_style;
+                if (params.audit_test_only != null)
+                    auditTestOnlySelect.value = String(params.audit_test_only);
                 if (params.resolution)
                     resolutionSelect.value = params.resolution;
                 if (params.ratio) ratioSelect.value = params.ratio;

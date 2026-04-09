@@ -103,7 +103,7 @@ _BASE_URL_OPTIONS = [
 _DEFAULT_BASE_URL = _BASE_URL_OPTIONS[0][1]
 _DEFAULT_AUDIT_API_URL = "http://118.196.112.236:3428/api/moderation/image"
 _AUDIT_API_URL_ENV_KEYS = ("ZLHUB_AUDIT_API_URL", "AUDIT_API_URL")
-_AUDIT_AES_KEY_ENV_KEYS = ("ZLHUB_AUDIT_AES_KEY", "AUDIT_AES_KEY")
+_FIXED_AUDIT_AES_KEY = "aadbd8d9c876e70c765835dbf7dded68a8edd681d5bb81dfcede045f704b6e25"
 
 DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
@@ -172,7 +172,7 @@ def _build_params_log_snapshot(params):
         "retry_count": params.get("retry_count"),
         "video_style": params.get("video_style"),
         "audit_user_id": params.get("audit_user_id"),
-        "audit_aes_key_present": bool(str(params.get("audit_aes_key", "")).strip()),
+        "audit_test_only": bool(params.get("audit_test_only")),
     }
 
 
@@ -473,6 +473,7 @@ def _build_default_params():
         "video_style": "其他风格",
         "audit_user_id": "",
         "audit_aes_key": "",
+        "audit_test_only": False,
     }
 
 
@@ -641,10 +642,8 @@ def _resolve_audit_api_url():
 
 
 def _resolve_audit_aes_key(audit_aes_key):
-    key = str(audit_aes_key or "").strip()
-    if key:
-        return key
-    return _env_first(_AUDIT_AES_KEY_ENV_KEYS)
+    _ = audit_aes_key
+    return _FIXED_AUDIT_AES_KEY
 
 
 def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
@@ -663,14 +662,7 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
     if user_id <= 0:
         raise PluginFatalError("素材审核失败: audit_user_id 必须大于 0")
 
-    aes_key = _resolve_audit_aes_key(audit_aes_key)
-    if not aes_key:
-        env_names = " / ".join(_AUDIT_AES_KEY_ENV_KEYS)
-        raise PluginFatalError(
-            f"素材审核失败: audit_aes_key 未设置（可在 UI 输入，或使用环境变量 {env_names}）"
-        )
-
-    cipher = AuditAESCipher(aes_key)
+    cipher = AuditAESCipher(_resolve_audit_aes_key(audit_aes_key))
     payload_plain = json.dumps(
         {"images": image_list}, ensure_ascii=False, separators=(",", ":")
     )
@@ -976,9 +968,14 @@ def _sanitize_params(raw_params=None):
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
     style = str(params.get("video_style", "其他风格") or "").strip()
-    params["video_style"] = style if style in {"仿真人风格", "其他风格"} else "其他风格"
+    style_lc = style.lower()
+    if "仿真" in style or "真人" in style or style_lc in {"human", "human_style", "realistic"}:
+        params["video_style"] = "仿真人风格"
+    else:
+        params["video_style"] = "其他风格"
     params["audit_user_id"] = str(params.get("audit_user_id", "")).strip()
     params["audit_aes_key"] = str(params.get("audit_aes_key", "")).strip()
+    params["audit_test_only"] = _normalize_web_search(params.get("audit_test_only"))
 
     pixel_width, pixel_height = _get_physical_pixels(
         params["resolution"], params["ratio"]
@@ -1080,8 +1077,11 @@ def _run_seedance_orchestration(context):
         progress_callback("参数校验完成")
 
         # --- 素材审核集成逻辑 ---
+        audit_test_only = bool(params.get("audit_test_only"))
         audited_images = reference_images
+        audit_triggered = False
         if params.get("video_style") == "仿真人风格" and reference_images:
+            audit_triggered = True
             progress_callback("正在进行人像素材审核...")
             _log_event("workflow.audit_trigger", style="仿真人风格")
             
@@ -1103,6 +1103,46 @@ def _run_seedance_orchestration(context):
                 _log_event("workflow.audit_failed", reason="未获取到 Asset URL")
                 raise PluginFatalError("素材审核未能返回有效的资源链接")
 
+        if audit_test_only:
+            if not audit_triggered:
+                raise PluginFatalError(
+                    "审核测试模式要求：视频风格为“仿真人风格”且至少提供 1 张参考图"
+                )
+            progress_callback("审核测试完成（未调用视频生成接口）")
+            _log_event("workflow.audit_test_only.success", asset_urls=audited_images)
+            task_log_id = _insert_task_log(
+                {
+                    "api_task_id": None,
+                    "model_name": params.get("model"),
+                    "model_display": params.get("model"),
+                    "prompt": str(prompt or "")[:500],
+                    "aspect_ratio": params.get("ratio"),
+                    "duration": str(params.get("duration")),
+                    "generation_mode": "audit_test_only",
+                    "status": "success",
+                    "metadata": {
+                        "polling": polling,
+                        "video_style": params.get("video_style"),
+                        "audited": True,
+                        "audit_test_only": True,
+                        "audit_assets": audited_images,
+                    },
+                }
+            )
+            return _build_orchestration_result(
+                task_id=f"audit-test-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                status="completed",
+                output_path=None,
+                video_url=None,
+                error=None,
+                meta={
+                    "polling": polling,
+                    "audit_test_only": True,
+                    "audit_assets": audited_images,
+                    "task_log_id": task_log_id,
+                },
+            )
+
         task_log_id = _insert_task_log(
             {
                 "api_task_id": None,
@@ -1116,7 +1156,8 @@ def _run_seedance_orchestration(context):
                 "metadata": {
                     "polling": polling,
                     "video_style": params.get("video_style"),
-                    "audited": bool(params.get("video_style") == "仿真人风格")
+                    "audited": bool(audit_triggered),
+                    "audit_test_only": False,
                 },
             }
         )
@@ -1141,10 +1182,8 @@ def _run_seedance_orchestration(context):
                 {
                     "polling": polling,
                     "video_style": params.get("video_style"),
-                    "audited": bool(
-                        params.get("video_style") == "仿真人风格"
-                        and _normalize_list_or_single(reference_images)
-                    ),
+                    "audited": bool(audit_triggered),
+                    "audit_test_only": False,
                     "request_payload": payload_snapshot,
                     "request_payload_file": payload_file,
                 },
@@ -1219,9 +1258,13 @@ def _run_seedance_orchestration(context):
 
 
 def _map_orchestration_to_plugin_output(result):
-    if result.get("status") == "completed" and result.get("output_path"):
-        output_path = result["output_path"]
-        return [output_path]
+    if result.get("status") == "completed":
+        meta = result.get("meta") or {}
+        if meta.get("audit_test_only"):
+            return []
+        if result.get("output_path"):
+            output_path = result["output_path"]
+            return [output_path]
     raise PluginFatalError(result.get("error") or "工作流执行失败")
 
 
