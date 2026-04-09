@@ -1187,37 +1187,3 @@ if __name__ == "__main__":
     if missing:
         raise SystemExit(f"smoke check failed, missing callables: {missing}")
     print("smoke check passed")
- SystemExit(f"smoke check failed, missing callables: {missing}")
-    print("smoke check passed")
-      rows.append(dict(row))
-        finally:
-            conn.close()
-        results = [_manual_download_video(row) for row in rows]
-        return {"ok": True, "results": results}
-    return {"ok": False, "error": f"未知动作: {action}"}
-
-
-_init_task_log_db()
-_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
-
-
-if __name__ == "__main__":
-    required_funcs = [
-        "_build_auth_headers",
-        "_build_create_payload",
-        "_create_task",
-        "_poll_task_status",
-        "_download_video",
-        "_normalize_polling_config",
-        "_normalize_terminal_status",
-        "_build_orchestration_result",
-        "_run_seedance_orchestration",
-        "_map_orchestration_to_plugin_output",
-        "run_seedance_workflow",
-        "run_seedance_client",
-        "handle_action",
-    ]
-    missing = [name for name in required_funcs if not callable(globals().get(name))]
-    if missing:
-        raise SystemExit(f"smoke check failed, missing callables: {missing}")
-    print("smoke check passed")
