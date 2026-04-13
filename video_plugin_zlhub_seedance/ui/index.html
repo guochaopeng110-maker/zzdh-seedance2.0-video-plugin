@@ -2,7 +2,7 @@
 <html lang="zh-CN">
     <head>
         <meta charset="UTF-8" />
-        <title>TDu&ZLHub Seedance 视频生成插件V1.1.0</title>
+        <title>TDu&ZLHub Seedance 视频生成插件V1.1.2</title>
         <link rel="stylesheet" href="../../../plugin-sdk.css" />
         <style>
             .api-key-wrapper {
@@ -57,7 +57,7 @@
         </style>
     </head>
     <body>
-        <h3>TDu&ZLHub Seedance 视频生成插件V1.1.0</h3>
+        <h3>TDu&ZLHub Seedance 视频生成插件V1.1.2</h3>
         <p class="hint-text">
             对接 ZLHub 中转平台，使用 Seedance 2.0 模型生成视频
         </p>
@@ -93,15 +93,9 @@
         <div class="form-row">
             <label class="form-label">审核密钥策略</label>
             <div class="form-control">
-                <input
-                    type="text"
-                    value="内置固定密钥（无需填写）"
-                    disabled
-                />
+                <input type="text" value="内置固定密钥（无需填写）" disabled />
             </div>
-            <div class="hint-text">
-                审核接口已改为使用插件内固定密钥。
-            </div>
+            <div class="hint-text">审核接口已改为使用插件内固定密钥。</div>
         </div>
 
         <div class="form-row">
@@ -297,8 +291,9 @@
             );
             var webSearchSelect = document.getElementById("webSearchSelect");
             var videoStyleSelect = document.getElementById("videoStyleSelect");
-            var auditTestOnlySelect =
-                document.getElementById("auditTestOnlySelect");
+            var auditTestOnlySelect = document.getElementById(
+                "auditTestOnlySelect",
+            );
             var auditUserIdInput = document.getElementById("auditUserIdInput");
             var timeoutInput = document.getElementById("timeoutInput");
             var baseUrlSelect = document.getElementById("baseUrlSelect");

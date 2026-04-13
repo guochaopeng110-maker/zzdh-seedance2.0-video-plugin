@@ -652,7 +652,7 @@ def _resolve_audit_aes_key(audit_aes_key):
     return _FIXED_AUDIT_AES_KEY
 
 
-def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
+def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=120):
     image_list = []
     for image in _normalize_list_or_single(images):
         item = str(image or "").strip()
@@ -678,7 +678,7 @@ def _call_material_audit_api(audit_user_id, audit_aes_key, images, timeout=30):
     }
 
     endpoint = _resolve_audit_api_url()
-    request_timeout = max(5, min(int(timeout or 30), 120))
+    request_timeout = max(5, min(int(timeout or 120), 120))
     _log_event(
         "audit.request",
         endpoint=endpoint,
