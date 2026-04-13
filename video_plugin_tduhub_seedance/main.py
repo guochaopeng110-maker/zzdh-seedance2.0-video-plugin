@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TDu&ZLHub Seedance 2.0 视频生成插件。
+TDuHub Seedance 2.0 视频生成插件。
 对接 TDuHub 中转平台，支持 Seedance 2.0 视频大模型。
 """
 
