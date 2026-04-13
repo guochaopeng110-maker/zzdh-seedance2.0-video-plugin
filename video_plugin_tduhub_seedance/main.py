@@ -122,6 +122,7 @@ DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
 DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
 DEFAULT_POLL_INTERVAL = 5
+DEFAULT_INITIAL_POLL_DELAY_SECONDS = 180
 DOWNLOAD_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
 )
@@ -889,8 +890,24 @@ def _poll_task_status(
     endpoint = f"{_normalize_base_url(base_url)}/{task_id}"
     headers = _build_auth_headers(api_key, include_content_type=True)
     previous_status = None
+    request_snapshot = {
+        "endpoint": endpoint,
+        "task_id": str(task_id),
+        "timeout": int(timeout),
+        "max_attempts": int(max_attempts),
+        "poll_interval": int(poll_interval),
+        "headers": {
+            "Authorization": f"Bearer {_mask_api_key(api_key)}",
+            "Content-Type": headers.get("Content-Type"),
+        },
+    }
 
     for attempt in range(1, int(max_attempts) + 1):
+        _log_event(
+            "poll_task.request",
+            attempt=attempt,
+            request=request_snapshot,
+        )
         response = requests.get(endpoint, headers=headers, timeout=timeout)
         _ensure_success_response(response, "查询任务状态")
 
@@ -1202,6 +1219,17 @@ def _run_seedance_orchestration(context):
         task_id, _ = _create_task(api_key, base_url, payload, polling["timeout"])
         _update_task_log(task_log_id, api_task_id=task_id)
         progress_callback("任务已创建")
+
+        initial_poll_delay = int(DEFAULT_INITIAL_POLL_DELAY_SECONDS)
+        _log_event(
+            "poll_task.initial_delay",
+            task_id=task_id,
+            delay_seconds=initial_poll_delay,
+            reason="等待任务落库，避免创建后立刻查询出现 404",
+        )
+        progress_callback(f"任务已创建，等待 {initial_poll_delay} 秒后开始状态轮询")
+        time.sleep(initial_poll_delay)
+
         progress_callback("状态轮询中")
 
         status_data, video_url = _poll_task_status(
