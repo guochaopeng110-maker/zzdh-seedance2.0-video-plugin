@@ -2,7 +2,7 @@
 <html lang="zh-CN">
     <head>
         <meta charset="UTF-8" />
-        <title>TDu&ZLHub Seedance 视频生成插件V1.1.2</title>
+        <title>TDu&ZLHub Seedance 视频生成插件V1.1.4</title>
         <link rel="stylesheet" href="../../../plugin-sdk.css" />
         <style>
             .api-key-wrapper {
@@ -387,7 +387,7 @@
             pollIntervalInput.addEventListener("change", function () {
                 PluginSDK.saveParam(
                     "poll_interval",
-                    parseInt(pollIntervalInput.value, 10) || 5,
+                    parseInt(pollIntervalInput.value, 10) || 180,
                 );
             });
 

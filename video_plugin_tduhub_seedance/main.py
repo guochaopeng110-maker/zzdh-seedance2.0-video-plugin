@@ -126,6 +126,8 @@ DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
 DEFAULT_POLL_INTERVAL = 180
 DEFAULT_INITIAL_POLL_DELAY_SECONDS = 180
+CONFIG_SCHEMA_VERSION = 2
+LEGACY_DEFAULT_POLL_INTERVAL = 5
 DOWNLOAD_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
 )
@@ -469,6 +471,7 @@ def get_info():
 def _build_default_params():
     """构建默认参数，与 API 文档及 UI 保持一致"""
     return {
+        "config_schema_version": CONFIG_SCHEMA_VERSION,
         "api_key": "",
         "base_url": _DEFAULT_BASE_URL,
         "model": DEFAULT_MODEL,
@@ -1066,6 +1069,22 @@ def _sanitize_params(raw_params=None):
     raw_params = raw_params or {}
     params = _default_params.copy()
     params.update(raw_params)
+
+    try:
+        raw_schema_version = int(
+            raw_params.get("config_schema_version", 1) or 1
+        )
+    except (TypeError, ValueError):
+        raw_schema_version = 1
+
+    # Migrate legacy configs that inherited the old default poll interval (5s).
+    if (
+        raw_schema_version < CONFIG_SCHEMA_VERSION
+        and raw_params.get("poll_interval") == LEGACY_DEFAULT_POLL_INTERVAL
+    ):
+        params["poll_interval"] = DEFAULT_POLL_INTERVAL
+
+    params["config_schema_version"] = CONFIG_SCHEMA_VERSION
 
     params["model"] = _normalize_model(params.get("model"))
     params["resolution"] = _normalize_resolution(params.get("resolution"))
