@@ -45,8 +45,11 @@ _PLUGIN_VERSION = "1.1.0"
 plugin_dir = Path(__file__).parent
 _TASK_LOG_DB_PATH = plugin_dir / "video_task_logs.db"
 _MANUAL_DOWNLOAD_DIR = plugin_dir / "downloads"
-_FILE_LOG_PATH = plugin_dir / "debug_runtime.log"
 _REQUEST_PAYLOAD_DIR = plugin_dir / "request_payloads"
+_RUNTIME_LOG_DIR = plugin_dir / "logs"
+_RUNTIME_LOG_FILE_PATH = (
+    _RUNTIME_LOG_DIR / f"debug_runtime_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+)
 _log_buffer = collections.deque(maxlen=2000)
 _log_index = 0
 _log_lock = threading.Lock()
@@ -121,7 +124,7 @@ DEFAULT_RESOLUTIONS = ["480p", "720p"]
 DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
 DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
-DEFAULT_POLL_INTERVAL = 5
+DEFAULT_POLL_INTERVAL = 180
 DEFAULT_INITIAL_POLL_DELAY_SECONDS = 180
 DOWNLOAD_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
@@ -201,7 +204,8 @@ def _append_file_log(level, message):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] [{str(level or 'INFO')}] {str(message or '')}\n"
     try:
-        with open(_FILE_LOG_PATH, "a", encoding="utf-8") as fw:
+        _RUNTIME_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_RUNTIME_LOG_FILE_PATH, "a", encoding="utf-8") as fw:
             fw.write(line)
     except Exception:
         # Never break plugin flow because file logging failed.
@@ -902,19 +906,62 @@ def _poll_task_status(
         },
     }
 
-    for attempt in range(1, int(max_attempts) + 1):
+    attempt = 0
+    while True:
+        attempt += 1
         _log_event(
             "poll_task.request",
             attempt=attempt,
             request=request_snapshot,
         )
-        response = requests.get(endpoint, headers=headers, timeout=timeout)
-        _ensure_success_response(response, "查询任务状态")
+
+        try:
+            response = requests.get(endpoint, headers=headers, timeout=timeout)
+        except requests.RequestException as exc:
+            _log_event(
+                "poll_task.query_error",
+                task_id=task_id,
+                attempt=attempt,
+                error=f"请求异常: {exc}",
+            )
+            if progress_callback:
+                progress_callback(
+                    f"状态查询异常，第 {attempt} 次将在 {int(poll_interval)} 秒后重试"
+                )
+            time.sleep(poll_interval)
+            continue
+
+        try:
+            _ensure_success_response(response, "查询任务状态")
+        except PluginFatalError as exc:
+            _log_event(
+                "poll_task.query_error",
+                task_id=task_id,
+                attempt=attempt,
+                error=str(exc),
+            )
+            if progress_callback:
+                progress_callback(
+                    f"状态查询失败，第 {attempt} 次将在 {int(poll_interval)} 秒后重试"
+                )
+            time.sleep(poll_interval)
+            continue
 
         try:
             data = response.json()
         except json.JSONDecodeError as exc:
-            raise PluginFatalError(f"状态查询返回非 JSON 响应: {exc}") from exc
+            _log_event(
+                "poll_task.query_error",
+                task_id=task_id,
+                attempt=attempt,
+                error=f"状态查询返回非 JSON 响应: {exc}",
+            )
+            if progress_callback:
+                progress_callback(
+                    f"状态查询返回非 JSON，第 {attempt} 次将在 {int(poll_interval)} 秒后重试"
+                )
+            time.sleep(poll_interval)
+            continue
 
         status = _normalize_task_status(data.get("status"))
         if status != previous_status:
@@ -924,16 +971,52 @@ def _poll_task_status(
             previous_status = status
         if status == "running":
             if progress_callback:
-                progress_callback(f"任务进行中 ({attempt}/{max_attempts})")
+                progress_callback(f"任务进行中 (第 {attempt} 次查询)")
             time.sleep(poll_interval)
             continue
         if status == "completed":
             return data, _extract_video_url_from_status(data)
         if status == "failed":
-            reason = data.get("fail_reason") or data.get("reason") or "未知原因"
-            raise PluginFatalError(f"任务失败: {reason}")
+            raw_error = data.get("error")
+            if isinstance(raw_error, dict):
+                raw_error = (
+                    raw_error.get("message")
+                    or raw_error.get("reason")
+                    or json.dumps(raw_error, ensure_ascii=False)
+                )
+            reason = (
+                data.get("fail_reason")
+                or data.get("reason")
+                or data.get("message")
+                or raw_error
+                or "未知原因"
+            )
+            _log_event(
+                "poll_task.failed_retry",
+                task_id=task_id,
+                attempt=attempt,
+                reason=reason,
+                retry_after_seconds=int(poll_interval),
+            )
+            if progress_callback:
+                progress_callback(
+                    f"任务状态失败({reason})，将在 {int(poll_interval)} 秒后继续查询"
+                )
+            time.sleep(poll_interval)
+            continue
 
-    raise PluginFatalError(f"超过最大轮询次数({max_attempts})，任务未完成")
+        _log_event(
+            "poll_task.unknown_retry",
+            task_id=task_id,
+            attempt=attempt,
+            raw_status=data.get("status"),
+            retry_after_seconds=int(poll_interval),
+        )
+        if progress_callback:
+            progress_callback(
+                f"任务状态未知({data.get('status')})，将在 {int(poll_interval)} 秒后继续查询"
+            )
+        time.sleep(poll_interval)
 
 
 def _task_root_from_base_url(base_url):
