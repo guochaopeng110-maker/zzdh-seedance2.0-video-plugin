@@ -995,18 +995,12 @@ def _poll_task_status(
                 or "未知原因"
             )
             _log_event(
-                "poll_task.failed_retry",
+                "poll_task.failed_stop",
                 task_id=task_id,
                 attempt=attempt,
                 reason=reason,
-                retry_after_seconds=int(poll_interval),
             )
-            if progress_callback:
-                progress_callback(
-                    f"任务状态失败({reason})，将在 {int(poll_interval)} 秒后继续查询"
-                )
-            time.sleep(poll_interval)
-            continue
+            raise PluginFatalError(f"任务失败: {reason}")
 
         _log_event(
             "poll_task.unknown_retry",
@@ -1071,9 +1065,7 @@ def _sanitize_params(raw_params=None):
     params.update(raw_params)
 
     try:
-        raw_schema_version = int(
-            raw_params.get("config_schema_version", 1) or 1
-        )
+        raw_schema_version = int(raw_params.get("config_schema_version", 1) or 1)
     except (TypeError, ValueError):
         raw_schema_version = 1
 

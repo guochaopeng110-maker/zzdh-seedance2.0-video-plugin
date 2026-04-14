@@ -1,249 +1,415 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <title>视频任务日志 / 手动拉取</title>
-  <link rel="stylesheet" href="../../../plugin-sdk.css">
-  <style>
-    body { padding: 16px 20px; }
-    h3 { margin-bottom: 12px; }
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-    .toolbar select { width: auto; min-width: 130px; }
-    .toolbar button { padding: 5px 14px; }
-    .toolbar .spacer { flex: 1; }
-    .toolbar .count { font-size: 11px; color: var(--text-muted); }
+    <head>
+        <meta charset="UTF-8" />
+        <title>视频任务日志 / 手动拉取</title>
+        <link rel="stylesheet" href="../../../plugin-sdk.css" />
+        <style>
+            body {
+                padding: 16px 20px;
+            }
+            h3 {
+                margin-bottom: 12px;
+            }
+            .toolbar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+            }
+            .toolbar select {
+                width: auto;
+                min-width: 130px;
+            }
+            .toolbar button {
+                padding: 5px 14px;
+            }
+            .toolbar .spacer {
+                flex: 1;
+            }
+            .toolbar .count {
+                font-size: 11px;
+                color: var(--text-muted);
+            }
 
-    .result-area {
-      margin-bottom: 10px;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-    .result-area .ok { color: var(--success); font-size: 12px; padding: 2px 0; }
-    .result-area .fail { color: var(--danger); font-size: 12px; padding: 2px 0; }
-    .result-area .info { color: var(--text-muted); font-size: 12px; }
+            .result-area {
+                margin-bottom: 10px;
+                max-height: 120px;
+                overflow-y: auto;
+            }
+            .result-area .ok {
+                color: var(--success);
+                font-size: 12px;
+                padding: 2px 0;
+            }
+            .result-area .fail {
+                color: var(--danger);
+                font-size: 12px;
+                padding: 2px 0;
+            }
+            .result-area .info {
+                color: var(--text-muted);
+                font-size: 12px;
+            }
 
-    .table-wrap {
-      overflow: auto;
-      flex: 1;
-    }
-    table { width: 100%; }
-    th { position: sticky; top: 0; background: var(--bg-primary); z-index: 1; white-space: nowrap; }
-    td { font-size: 12px; vertical-align: top; }
-    .col-check { width: 32px; text-align: center; }
-    .col-id { width: 44px; }
-    .col-time { width: 130px; white-space: nowrap; }
-    .col-model { width: 160px; }
-    .col-status { width: 90px; }
-    .col-mode { width: 60px; }
-    .col-duration { width: 50px; text-align: center; }
-    .col-prompt { min-width: 200px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .col-error { min-width: 120px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--danger); font-size: 11px; }
+            .table-wrap {
+                overflow: auto;
+                flex: 1;
+            }
+            table {
+                width: 100%;
+            }
+            th {
+                position: sticky;
+                top: 0;
+                background: var(--bg-primary);
+                z-index: 1;
+                white-space: nowrap;
+            }
+            td {
+                font-size: 12px;
+                vertical-align: top;
+            }
+            .col-check {
+                width: 32px;
+                text-align: center;
+            }
+            .col-id {
+                width: 44px;
+            }
+            .col-taskid {
+                width: 140px;
+            }
+            .col-time {
+                width: 130px;
+                white-space: nowrap;
+            }
+            .col-model {
+                width: 160px;
+            }
+            .col-status {
+                width: 90px;
+            }
+            .col-mode {
+                width: 60px;
+            }
+            .col-duration {
+                width: 50px;
+                text-align: center;
+            }
+            .col-prompt {
+                min-width: 200px;
+                max-width: 400px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .col-error {
+                min-width: 120px;
+                max-width: 300px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                color: var(--danger);
+                font-size: 11px;
+            }
 
-    .status-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-    .empty-hint { text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 13px; }
+            .status-badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 3px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            .empty-hint {
+                text-align: center;
+                color: var(--text-muted);
+                padding: 40px 0;
+                font-size: 13px;
+            }
 
-    input[type="checkbox"]:disabled { opacity: 0.3; }
-  </style>
-</head>
-<body>
-  <h3>视频任务日志 / 手动拉取</h3>
+            input[type="checkbox"]:disabled {
+                opacity: 0.3;
+            }
+        </style>
+    </head>
+    <body>
+        <h3>视频任务日志 / 手动拉取</h3>
 
-  <div class="toolbar">
-    <select id="statusFilter">
-      <option value="">全部状态</option>
-      <option value="success">下载成功</option>
-      <option value="manual_success">手动下载成功</option>
-      <option value="download_failed">下载失败</option>
-      <option value="failed">生成失败</option>
-      <option value="no_retry_error">不可重试错误</option>
-      <option value="running">运行中</option>
-    </select>
-    <button id="refreshBtn" type="button">刷新</button>
-    <button id="downloadBtn" class="btn-primary" type="button">下载选中视频</button>
-    <span class="spacer"></span>
-    <span class="count" id="countLabel"></span>
-  </div>
+        <div class="toolbar">
+            <select id="statusFilter">
+                <option value="">全部状态</option>
+                <option value="success">下载成功</option>
+                <option value="manual_success">手动下载成功</option>
+                <option value="download_failed">下载失败</option>
+                <option value="failed">生成失败</option>
+                <option value="no_retry_error">不可重试错误</option>
+                <option value="running">运行中</option>
+            </select>
+            <button id="refreshBtn" type="button">刷新</button>
+            <button id="downloadBtn" class="btn-primary" type="button">
+                下载选中视频
+            </button>
+            <span class="spacer"></span>
+            <span class="count" id="countLabel"></span>
+        </div>
 
-  <div class="result-area" id="resultArea"></div>
+        <div class="result-area" id="resultArea"></div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="col-check"><input type="checkbox" id="checkAll"></th>
-          <th class="col-id">ID</th>
-          <th class="col-time">创建时间</th>
-          <th class="col-model">模型</th>
-          <th class="col-status">状态</th>
-          <th class="col-mode">模式</th>
-          <th class="col-duration">时长</th>
-          <th class="col-prompt">提示词</th>
-          <th class="col-error">错误信息</th>
-        </tr>
-      </thead>
-      <tbody id="logBody"></tbody>
-    </table>
-    <div class="empty-hint" id="emptyHint" style="display:none;">暂无任务日志</div>
-  </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-check">
+                            <input type="checkbox" id="checkAll" />
+                        </th>
+                        <th class="col-id">ID</th>
+                        <th class="col-taskid">任务 ID</th>
+                        <th class="col-time">创建时间</th>
+                        <th class="col-model">模型</th>
+                        <th class="col-status">状态</th>
+                        <th class="col-mode">模式</th>
+                        <th class="col-duration">时长</th>
+                        <th class="col-prompt">提示词</th>
+                        <th class="col-error">错误信息</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody"></tbody>
+            </table>
+            <div class="empty-hint" id="emptyHint" style="display: none">
+                暂无任务日志
+            </div>
+        </div>
 
-  <script>
-    /* ===== 与主窗口通信 ===== */
-    var PopupComm = {
-      _handlers: {},
-      send: function (action, data) {
-        if (window.opener) {
-          window.opener.postMessage({
-            __typetale_plugin: true,
-            type: 'plugin_action',
-            action: action,
-            data: data || {}
-          }, '*')
-        }
-      },
-      onAction: function (action, cb) {
-        if (!this._handlers[action]) this._handlers[action] = []
-        this._handlers[action].push(cb)
-      }
-    }
-    window.addEventListener('message', function (evt) {
-      var d = evt.data
-      if (!d || d.__typetale_plugin !== true || d.type !== 'action') return
-      var cbs = PopupComm._handlers[d.action]
-      if (cbs) cbs.forEach(function (cb) { try { cb(d.data) } catch(e) { console.error(e) } })
-    })
+        <script>
+            /* ===== 与主窗口通信 ===== */
+            var PopupComm = {
+                _handlers: {},
+                send: function (action, data) {
+                    if (window.opener) {
+                        window.opener.postMessage(
+                            {
+                                __typetale_plugin: true,
+                                type: "plugin_action",
+                                action: action,
+                                data: data || {},
+                            },
+                            "*",
+                        );
+                    }
+                },
+                onAction: function (action, cb) {
+                    if (!this._handlers[action]) this._handlers[action] = [];
+                    this._handlers[action].push(cb);
+                },
+            };
+            window.addEventListener("message", function (evt) {
+                var d = evt.data;
+                if (!d || d.__typetale_plugin !== true || d.type !== "action")
+                    return;
+                var cbs = PopupComm._handlers[d.action];
+                if (cbs)
+                    cbs.forEach(function (cb) {
+                        try {
+                            cb(d.data);
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    });
+            });
 
-    /* ===== DOM ===== */
-    var logBody = document.getElementById('logBody')
-    var emptyHint = document.getElementById('emptyHint')
-    var statusFilter = document.getElementById('statusFilter')
-    var checkAll = document.getElementById('checkAll')
-    var resultArea = document.getElementById('resultArea')
-    var countLabel = document.getElementById('countLabel')
+            /* ===== DOM ===== */
+            var logBody = document.getElementById("logBody");
+            var emptyHint = document.getElementById("emptyHint");
+            var statusFilter = document.getElementById("statusFilter");
+            var checkAll = document.getElementById("checkAll");
+            var resultArea = document.getElementById("resultArea");
+            var countLabel = document.getElementById("countLabel");
 
-    /* ===== 事件 ===== */
-    document.getElementById('refreshBtn').addEventListener('click', loadLogs)
-    statusFilter.addEventListener('change', loadLogs)
+            /* ===== 事件 ===== */
+            document
+                .getElementById("refreshBtn")
+                .addEventListener("click", loadLogs);
+            statusFilter.addEventListener("change", loadLogs);
 
-    checkAll.addEventListener('change', function () {
-      var boxes = logBody.querySelectorAll('input[type="checkbox"]:not(:disabled)')
-      for (var i = 0; i < boxes.length; i++) boxes[i].checked = checkAll.checked
-    })
+            checkAll.addEventListener("change", function () {
+                var boxes = logBody.querySelectorAll(
+                    'input[type="checkbox"]:not(:disabled)',
+                );
+                for (var i = 0; i < boxes.length; i++)
+                    boxes[i].checked = checkAll.checked;
+            });
 
-    document.getElementById('downloadBtn').addEventListener('click', function () {
-      var boxes = logBody.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)')
-      var ids = []
-      for (var i = 0; i < boxes.length; i++) ids.push(parseInt(boxes[i].dataset.id))
-      if (!ids.length) {
-        resultArea.innerHTML = '<div class="fail">请先勾选有视频 URL 的任务</div>'
-        return
-      }
-      resultArea.innerHTML = '<div class="info">正在下载 ' + ids.length + ' 个视频…</div>'
-      PopupComm.send('download_videos', { task_ids: ids })
-    })
+            document
+                .getElementById("downloadBtn")
+                .addEventListener("click", function () {
+                    var boxes = logBody.querySelectorAll(
+                        'input[type="checkbox"]:checked:not(:disabled)',
+                    );
+                    var ids = [];
+                    for (var i = 0; i < boxes.length; i++)
+                        ids.push(parseInt(boxes[i].dataset.id));
+                    if (!ids.length) {
+                        resultArea.innerHTML =
+                            '<div class="fail">请先勾选有视频 URL 的任务</div>';
+                        return;
+                    }
+                    resultArea.innerHTML =
+                        '<div class="info">正在下载 ' +
+                        ids.length +
+                        " 个视频…</div>";
+                    PopupComm.send("download_videos", { task_ids: ids });
+                });
 
-    /* ===== 数据加载 ===== */
-    function loadLogs() {
-      var status = statusFilter.value || undefined
-      PopupComm.send('get_task_logs', { limit: 500, status: status })
-    }
+            /* ===== 数据加载 ===== */
+            function loadLogs() {
+                var status = statusFilter.value || undefined;
+                PopupComm.send("get_task_logs", { limit: 500, status: status });
+            }
 
-    PopupComm.onAction('get_task_logs', function (data) {
-      if (data && data.ok) {
-        renderLogs(data.logs)
-      } else if (data && data.error) {
-        emptyHint.style.display = ''
-        emptyHint.textContent = '加载失败: ' + data.error
-        logBody.innerHTML = ''
-        countLabel.textContent = ''
-      }
-    })
+            PopupComm.onAction("get_task_logs", function (data) {
+                if (data && data.ok) {
+                    renderLogs(data.logs);
+                } else if (data && data.error) {
+                    emptyHint.style.display = "";
+                    emptyHint.textContent = "加载失败: " + data.error;
+                    logBody.innerHTML = "";
+                    countLabel.textContent = "";
+                }
+            });
 
-    PopupComm.onAction('download_videos', function (data) {
-      if (data && data.ok) {
-        renderDownloadResults(data.results)
-        loadLogs()
-      } else if (data && data.error) {
-        resultArea.innerHTML = '<div class="fail">' + esc(data.error) + '</div>'
-      }
-    })
+            PopupComm.onAction("download_videos", function (data) {
+                if (data && data.ok) {
+                    renderDownloadResults(data.results);
+                    loadLogs();
+                } else if (data && data.error) {
+                    resultArea.innerHTML =
+                        '<div class="fail">' + esc(data.error) + "</div>";
+                }
+            });
 
-    var STATUS_MAP = {
-      'running':        ['生成中',        '#FFD600'],
-      'success':        ['成功',          '#4CAF50'],
-      'manual_success': ['手动下载成功',  '#4CAF50'],
-      'failed':         ['失败(重试耗尽)','#FF5252'],
-      'no_retry_error': ['失败(不可重试)','#FF5252'],
-      'download_failed':['下载失败',      '#42A5F5'],
-      'manual_failed':  ['手动下载失败',  '#42A5F5']
-    }
+            var STATUS_MAP = {
+                running: ["生成中", "#FFD600"],
+                success: ["成功", "#4CAF50"],
+                manual_success: ["手动下载成功", "#4CAF50"],
+                failed: ["失败(重试耗尽)", "#FF5252"],
+                no_retry_error: ["失败(不可重试)", "#FF5252"],
+                download_failed: ["下载失败", "#42A5F5"],
+                manual_failed: ["手动下载失败", "#42A5F5"],
+            };
 
-    function renderLogs(logs) {
-      logs = logs || []
-      checkAll.checked = false
-      resultArea.innerHTML = ''
-      countLabel.textContent = '共 ' + logs.length + ' 条'
-      if (!logs.length) {
-        logBody.innerHTML = ''
-        emptyHint.style.display = ''
-        return
-      }
-      emptyHint.style.display = 'none'
-      var html = ''
-      for (var i = 0; i < logs.length; i++) {
-        var log = logs[i]
-        var hasUrl = !!(log.video_url)
-        var st = STATUS_MAP[log.status] || [log.status || '未知', '#888']
-        var sText = st[0], sColor = st[1]
-        var prompt = (log.prompt || '').substring(0, 60)
-        var errText = (log.error || '').substring(0, 80)
-        html += '<tr>'
-        html += '<td class="col-check"><input type="checkbox" data-id="' + log.id + '"' + (hasUrl ? '' : ' disabled title="无视频URL，不可下载"') + '></td>'
-        html += '<td class="col-id">' + log.id + '</td>'
-        html += '<td class="col-time">' + esc(log.created_at || '') + '</td>'
-        html += '<td class="col-model">' + esc(log.model_display || log.model_name || '') + '</td>'
-        html += '<td class="col-status"><span class="status-badge" style="color:' + sColor + ';border:1px solid ' + sColor + '40">' + esc(sText) + '</span></td>'
-        html += '<td class="col-mode">' + esc(log.generation_mode || '') + '</td>'
-        html += '<td class="col-duration">' + esc(log.duration || '') + 's</td>'
-        html += '<td class="col-prompt" title="' + esc(log.prompt || '') + '">' + esc(prompt) + '</td>'
-        html += '<td class="col-error" title="' + esc(log.error || '') + '">' + esc(errText) + '</td>'
-        html += '</tr>'
-      }
-      logBody.innerHTML = html
-    }
+            function renderLogs(logs) {
+                logs = logs || [];
+                checkAll.checked = false;
+                resultArea.innerHTML = "";
+                countLabel.textContent = "共 " + logs.length + " 条";
+                if (!logs.length) {
+                    logBody.innerHTML = "";
+                    emptyHint.style.display = "";
+                    return;
+                }
+                emptyHint.style.display = "none";
+                var html = "";
+                for (var i = 0; i < logs.length; i++) {
+                    var log = logs[i];
+                    var hasUrl = !!log.video_url;
+                    var st = STATUS_MAP[log.status] || [
+                        log.status || "未知",
+                        "#888",
+                    ];
+                    var sText = st[0],
+                        sColor = st[1];
+                    var prompt = (log.prompt || "").substring(0, 60);
+                    var errText = (log.error || "").substring(0, 80);
+                    html += "<tr>";
+                    html +=
+                        '<td class="col-check"><input type="checkbox" data-id="' +
+                        log.id +
+                        '"' +
+                        (hasUrl
+                            ? ""
+                            : ' disabled title="无视频URL，不可下载"') +
+                        "></td>";
+                    html += '<td class="col-id">' + log.id + "</td>";
+                    html +=
+                        '<td class="col-taskid" title="' +
+                        esc(log.api_task_id || "") +
+                        '">' +
+                        esc(log.api_task_id || "") +
+                        "</td>";
+                    html +=
+                        '<td class="col-time">' +
+                        esc(log.created_at || "") +
+                        "</td>";
+                    html +=
+                        '<td class="col-model">' +
+                        esc(log.model_display || log.model_name || "") +
+                        "</td>";
+                    html +=
+                        '<td class="col-status"><span class="status-badge" style="color:' +
+                        sColor +
+                        ";border:1px solid " +
+                        sColor +
+                        '40">' +
+                        esc(sText) +
+                        "</span></td>";
+                    html +=
+                        '<td class="col-mode">' +
+                        esc(log.generation_mode || "") +
+                        "</td>";
+                    html +=
+                        '<td class="col-duration">' +
+                        esc(log.duration || "") +
+                        "s</td>";
+                    html +=
+                        '<td class="col-prompt" title="' +
+                        esc(log.prompt || "") +
+                        '">' +
+                        esc(prompt) +
+                        "</td>";
+                    html +=
+                        '<td class="col-error" title="' +
+                        esc(log.error || "") +
+                        '">' +
+                        esc(errText) +
+                        "</td>";
+                    html += "</tr>";
+                }
+                logBody.innerHTML = html;
+            }
 
-    function renderDownloadResults(results) {
-      if (!results || !results.length) return
-      var html = ''
-      for (var i = 0; i < results.length; i++) {
-        var r = results[i]
-        if (r.status === 'manual_success') {
-          html += '<div class="ok">ID ' + r.id + ': 下载成功 → ' + esc(r.path || '') + '</div>'
-        } else {
-          html += '<div class="fail">ID ' + r.id + ': ' + esc(r.error || '下载失败') + '</div>'
-        }
-      }
-      resultArea.innerHTML = html
-    }
+            function renderDownloadResults(results) {
+                if (!results || !results.length) return;
+                var html = "";
+                for (var i = 0; i < results.length; i++) {
+                    var r = results[i];
+                    if (r.status === "manual_success") {
+                        html +=
+                            '<div class="ok">ID ' +
+                            r.id +
+                            ": 下载成功 → " +
+                            esc(r.path || "") +
+                            "</div>";
+                    } else {
+                        html +=
+                            '<div class="fail">ID ' +
+                            r.id +
+                            ": " +
+                            esc(r.error || "下载失败") +
+                            "</div>";
+                    }
+                }
+                resultArea.innerHTML = html;
+            }
 
-    function esc(text) {
-      var d = document.createElement('div')
-      d.textContent = text || ''
-      return d.innerHTML
-    }
+            function esc(text) {
+                var d = document.createElement("div");
+                d.textContent = text || "";
+                return d.innerHTML;
+            }
 
-    loadLogs()
-  </script>
-</body>
+            loadLogs();
+        </script>
+    </body>
 </html>
