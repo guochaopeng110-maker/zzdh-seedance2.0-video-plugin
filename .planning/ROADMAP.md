@@ -130,5 +130,15 @@ Plans:
 Plans:
 - [x] 07.1-01: Fix audit params pipeline and plugin load stability
 
+### Phase 8: 适配ZLHub新版视频任务与素材审核接口（requires2）
+
+**Goal:** 在不改宿主调用契约的前提下，落地 `video_plugin_zlhub_seedance_V2`，完成 requires2 视频任务接口与素材审核接口迁移。
+**Requirements**: CONT-03, ERR-01, ORCH-01
+**Depends on:** Phase 7
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 08-01: ZLHub requires2 API 迁移与 V2 插件落地
+
 ---
-*最后更新：2026-04-08*
+*最后更新：2026-04-23*
