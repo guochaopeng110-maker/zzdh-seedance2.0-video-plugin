@@ -142,3 +142,13 @@ Plans:
 
 ---
 *最后更新：2026-04-23*
+
+### Phase 08.1: 实现参考素材TOS上传并在审核/生成前统一转公网URL (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 08.1 to break down)

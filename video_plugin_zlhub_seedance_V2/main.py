@@ -5,9 +5,12 @@ TDu&ZLHub Seedance 2.0 视频生成插件。
 """
 
 import collections
+import base64
+import io
 import json
 import mimetypes
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -16,6 +19,10 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+try:
+    import tos
+except ImportError:
+    tos = None
 
 # 导入插件工具类
 try:
@@ -61,6 +68,9 @@ _PLUGIN_FILE = __file__
 _DEFAULT_TASK_CREATE_URL = "https://api.zlhub.cn/v1/task/create"
 _DEFAULT_TASK_QUERY_URL = "https://api.zlhub.cn/v1/task/get"
 _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
+_DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
+_DEFAULT_TOS_REGION = "cn-beijing"
+_DEFAULT_TOS_BUCKET = "zlhub-asset-outside"
 
 DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
@@ -147,6 +157,11 @@ def _build_params_log_snapshot(params):
         ),
         "audit_callback_url": params.get("audit_callback_url"),
         "audit_test_only": bool(params.get("audit_test_only")),
+        "tos_ak_present": bool(str(params.get("tos_ak", "")).strip()),
+        "tos_sk_present": bool(str(params.get("tos_sk", "")).strip()),
+        "tos_endpoint": params.get("tos_endpoint"),
+        "tos_region": params.get("tos_region"),
+        "tos_bucket": params.get("tos_bucket"),
     }
 
 
@@ -440,6 +455,11 @@ def _build_default_params():
         "asset_base_url": _DEFAULT_ASSET_BASE_URL,
         "audit_access_token": "",
         "audit_callback_url": "",
+        "tos_ak": "",
+        "tos_sk": "",
+        "tos_endpoint": _DEFAULT_TOS_ENDPOINT,
+        "tos_region": _DEFAULT_TOS_REGION,
+        "tos_bucket": _DEFAULT_TOS_BUCKET,
         "model": DEFAULT_MODEL,
         "resolution": DEFAULT_RESOLUTION,
         "ratio": DEFAULT_RATIO,
@@ -1163,6 +1183,17 @@ def _sanitize_params(raw_params=None):
     )
     params["audit_access_token"] = str(params.get("audit_access_token", "")).strip()
     params["audit_callback_url"] = str(params.get("audit_callback_url", "")).strip()
+    params["tos_ak"] = str(params.get("tos_ak", "")).strip()
+    params["tos_sk"] = str(params.get("tos_sk", "")).strip()
+    params["tos_endpoint"] = str(
+        params.get("tos_endpoint", _DEFAULT_TOS_ENDPOINT) or _DEFAULT_TOS_ENDPOINT
+    ).strip().rstrip("/")
+    params["tos_region"] = str(
+        params.get("tos_region", _DEFAULT_TOS_REGION) or _DEFAULT_TOS_REGION
+    ).strip()
+    params["tos_bucket"] = str(
+        params.get("tos_bucket", _DEFAULT_TOS_BUCKET) or _DEFAULT_TOS_BUCKET
+    ).strip()
     style = str(params.get("video_style", "其他风格") or "").strip()
     style_lc = style.lower()
     if (

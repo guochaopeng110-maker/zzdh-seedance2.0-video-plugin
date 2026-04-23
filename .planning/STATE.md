@@ -1,4 +1,4 @@
----
+﻿---
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
@@ -12,60 +12,47 @@ progress:
   completed_plans: 2
 ---
 
-# 项目状态: video_plugin_zlhub_seedance
+# 椤圭洰鐘舵€? video_plugin_zlhub_seedance
 
-## 项目参考
+## 椤圭洰鍙傝€?
+鍙傝: .planning/PROJECT.md (鏇存柊浜?2026-03-30)
 
-参见: .planning/PROJECT.md (更新于 2026-03-30)
-
-**核心价值:** 新增的 zlhub seedance2.0 插件必须在不改宿主程序的前提下，被字字动画稳定加载并完成完整的视频生成主链路。
-**当前焦点:** 阶段 5 — UI 与集成（等待宿主人工验证）
-
-## 里程碑进度
-
-| 阶段 | 状态 | 计划 | 进度 |
+**鏍稿績浠峰€?** 鏂板鐨?zlhub seedance2.0 鎻掍欢蹇呴』鍦ㄤ笉鏀瑰涓荤▼搴忕殑鍓嶆彁涓嬶紝琚瓧瀛楀姩鐢荤ǔ瀹氬姞杞藉苟瀹屾垚瀹屾暣鐨勮棰戠敓鎴愪富閾捐矾銆?**褰撳墠鐒︾偣:** 闃舵 5 鈥?UI 涓庨泦鎴愶紙绛夊緟瀹夸富浜哄伐楠岃瘉锛?
+## 閲岀▼纰戣繘搴?
+| 闃舵 | 鐘舵€?| 璁″垝 | 杩涘害 |
 |-------|--------|-------|----------|
-| 1     | ✓      | 1/1   | 100%     |
-| 2     | ✓      | 1/1   | 100%     |
-| 3     | ✓      | 1/1   | 100%     |
-| 4     | ✓      | 1/1   | 100%     |
-| 5     | ⚠      | 1/1   | 100% (代码级) |
+| 1     | 鉁?     | 1/1   | 100%     |
+| 2     | 鉁?     | 1/1   | 100%     |
+| 3     | 鉁?     | 1/1   | 100%     |
+| 4     | 鉁?     | 1/1   | 100%     |
+| 5     | 鈿?     | 1/1   | 100% (浠ｇ爜绾? |
 
-**总体进度:** 80%
+**鎬讳綋杩涘害:** 80%
 
-## 当前激活阶段: 7 — 素材审核集成
+## 褰撳墠婵€娲婚樁娈? 7 鈥?绱犳潗瀹℃牳闆嗘垚
 
-**目标:** 对参考图片进行合规性审核，确保包含人像的图片在使用前通过安全检测。
+**鐩爣:** 瀵瑰弬鑰冨浘鐗囪繘琛屽悎瑙勬€у鏍革紝纭繚鍖呭惈浜哄儚鐨勫浘鐗囧湪浣跨敤鍓嶉€氳繃瀹夊叏妫€娴嬨€?
+**闇€姹?**
 
-**需求:**
+- [ ] AUDIT-01: UI 鏂板鈥滆棰戦鏍尖€濋€夋嫨锛堜豢鐪熶汉/鍏朵粬锛夈€?- [ ] AUDIT-02: 瀹炵幇 AES-256-ECB 鍔犺В瀵嗗伐鍏风被銆?- [ ] AUDIT-03: 闆嗘垚绱犳潗瀹℃牳宸ヤ綔娴侊紝灏?URL 杞崲涓?Asset 璧勬簮銆?
+**鎴愬姛鏍囧噯:**
 
-- [ ] AUDIT-01: UI 新增“视频风格”选择（仿真人/其他）。
-- [ ] AUDIT-02: 实现 AES-256-ECB 加解密工具类。
-- [ ] AUDIT-03: 集成素材审核工作流，将 URL 转换为 Asset 资源。
-
-**成功标准:**
-
-- [ ] UI 成功保存并加载 `video_style` 参数。
-- [ ] 选择“仿真人”时，后台自动触发审核接口。
-- [ ] 审核返回的 Asset 资源正确传递给 Seedance 视频生成接口。
-
+- [ ] UI 鎴愬姛淇濆瓨骞跺姞杞?`video_style` 鍙傛暟銆?- [ ] 閫夋嫨鈥滀豢鐪熶汉鈥濇椂锛屽悗鍙拌嚜鍔ㄨЕ鍙戝鏍告帴鍙ｃ€?- [ ] 瀹℃牳杩斿洖鐨?Asset 璧勬簮姝ｇ‘浼犻€掔粰 Seedance 瑙嗛鐢熸垚鎺ュ彛銆?
 ---
-*最后更新：2026-04-02*
+*鏈€鍚庢洿鏂帮細2026-04-02*
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-- Phase 8 added: 适配ZLHub新版视频任务与素材审核接口（requires2）
-
-- Phase 7.1 inserted after Phase 7: 修复审核参数链路与插件加载问题 (URGENT)
-- Phase 6 added: 为 zlhub 插件增加实时日志和任务日志界面（参考 geeknow）
-
+- Phase 8 added: 閫傞厤ZLHub鏂扮増瑙嗛浠诲姟涓庣礌鏉愬鏍告帴鍙ｏ紙requires2锛?
+- Phase 7.1 inserted after Phase 7: 淇瀹℃牳鍙傛暟閾捐矾涓庢彃浠跺姞杞介棶棰?(URGENT)
+- Phase 6 added: 涓?zlhub 鎻掍欢澧炲姞瀹炴椂鏃ュ織鍜屼换鍔℃棩蹇楃晫闈紙鍙傝€?geeknow锛?
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
-| 260403-feb | 新增 README 文档，补充项目简介、安装、使用、FAQ，并插入 docs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染 | 2026-04-03 | fac810e | Verified | [260403-feb-readme-faq-docs-images-logs-windows-png-](./quick/260403-feb-readme-faq-docs-images-logs-windows-png-/) |
+| 260403-feb | 鏂板 README 鏂囨。锛岃ˉ鍏呴」鐩畝浠嬨€佸畨瑁呫€佷娇鐢ㄣ€丗AQ锛屽苟鎻掑叆 docs/images/logs-windows.png 涓?docs/images/plugin_menu.png锛岀‘淇?Markdown 鍥剧墖璺緞姝ｇ‘鍙覆鏌?| 2026-04-03 | fac810e | Verified | [260403-feb-readme-faq-docs-images-logs-windows-png-](./quick/260403-feb-readme-faq-docs-images-logs-windows-png-/) |
 
 Last activity: 2026-04-23
-ocs/images/logs-windows.png 与 docs/images/plugin_menu.png，确保 Markdown 图片路径正确可渲染
+ocs/images/logs-windows.png 涓?docs/images/plugin_menu.png锛岀‘淇?Markdown 鍥剧墖璺緞姝ｇ‘鍙覆鏌?
