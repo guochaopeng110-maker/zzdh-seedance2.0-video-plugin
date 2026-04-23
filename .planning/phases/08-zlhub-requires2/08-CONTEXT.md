@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-在不改变宿主调用契约（`get_info/get_params/generate`）的前提下，将 `video_plugin_zlhub_seedance` 从旧版 ZLHub 任务接口与旧版素材审核链路迁移到 requires2 定义的新接口：
+在不改变宿主调用契约（`get_info/get_params/generate`）的前提下，复制 `video_plugin_zlhub_seedance` 为 `video_plugin_zlhub_seedance_V2`，并在 V2 中按 requires2 定义实施新版接口（不兼容旧行为）：
 1. 视频任务创建与查询切换到 `https://api.zlhub.cn/v1/task/create` 与 `https://api.zlhub.cn/v1/task/get/{id}`。
 2. 素材审核切换到 `https://asset.zlhub.cn` 的 Header Token 鉴权模型，取消 AES-ECB。
 3. 审核输入仅接受公网 URL，不再接受 Base64。
@@ -21,11 +21,13 @@
 - **D-01:** `base_url` 从旧地址改为固定新建任务地址 `https://api.zlhub.cn/v1/task/create`，并同步更新 UI 默认值。
 - **D-02:** 任务查询不再使用 `base_url + /{task_id}` 拼接；改为独立查询根 `https://api.zlhub.cn/v1/task/get/{id}`。
 - **D-03:** 请求鉴权继续使用 `Authorization: Bearer <API_KEY>`，但增加可选 `X-Trace-ID`（每次请求唯一），用于排障追踪。
+- **D-11:** 明确不做新旧视频接口双轨兼容；V2 仅支持 requires2 新版任务接口。
 
 ### 素材审核协议重构
 - **D-04:** 移除 `AuditAESCipher`、固定 AES key、`encrypted_data` 请求体方案；改用标准 Header Token 鉴权调用 `asset.zlhub.cn`。
 - **D-05:** 审核请求统一传 `images: [http/https URL]`；若输入为本地文件或 `data:` Base64，直接报错并提示先上传公网存储。
 - **D-06:** 审核返回以 `items[].downstream_asset_id` 为主，统一转换为 `asset://<id>` 供视频生成 `content.*_url.url` 使用。
+- **D-12:** 明确不兼容旧素材输入行为（Base64/旧加密体）；V2 仅接受公网 URL。
 
 ### 审核异步策略
 - **D-07:** 以异步提交为主路径（`POST /api/asset/upload/async`），通过 `GET /api/task/{task_id}` 轮询；保留 callback_url 透传能力。
@@ -34,6 +36,9 @@
 ### 错误与可观测性
 - **D-09:** 对外错误前缀维持 `PLUGIN_ERROR:::` 不变；新增 trace-id、audit task id、video task id 的结构化日志字段。
 - **D-10:** `audit_test_only` 模式保留，但行为调整为“仅走新审核链路，不触发视频创建”，用于联调验证。
+
+### 目录与发布策略
+- **D-13:** 本阶段在 `video_plugin_zlhub_seedance_V2` 目录实现所有改造；原目录 `video_plugin_zlhub_seedance` 维持现状，不承载兼容分支逻辑。
 
 ### the agent's Discretion
 - Trace-ID 生成细节（UUIDv4 或 32 位随机串）由实现阶段选择，但必须保证请求级唯一。

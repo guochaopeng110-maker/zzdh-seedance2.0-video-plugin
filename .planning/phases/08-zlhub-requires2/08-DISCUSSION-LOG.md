@@ -5,8 +5,12 @@
 
 **Date:** 2026-04-23
 **Phase:** 08-zlhub-requires2
-**Mode:** discuss (execute fallback, default recommendations selected)
+**Mode:** discuss
 **Areas discussed:** 视频任务接口迁移, 素材审核协议重构, 审核异步策略, 错误与可观测性
+**User explicit constraints (2026-04-23):**
+- Phase 8 采用 `video_plugin_zlhub_seedance_V2` 新目录开发（从原插件拷贝）。
+- 不做新旧接口双轨兼容。
+- 不兼容旧素材输入行为（不接受 Base64/旧加密协议）。
 
 ---
 
@@ -18,8 +22,8 @@
 | 新建/查询分离（推荐） | 创建固定 `POST /v1/task/create`，查询固定 `GET /v1/task/get/{id}` | ✅ |
 | 双轨兼容 | 新旧接口并存，按开关切换 | |
 
-**User's choice:** 未显式交互，按执行模式默认采用推荐项。
-**Notes:** 与 requires2 文档一致，避免旧 base_url 拼接耦合。
+**User's choice:** 显式选择“新建/查询分离”，并明确禁止双轨兼容。
+**Notes:** 与 requires2 文档一致，V2 仅保留新版任务接口实现。
 
 ---
 
@@ -44,8 +48,8 @@
 | 仅接受公网 URL（推荐） | 本地/`data:` 输入先上传对象存储，再传 URL | ✅ |
 | 内部自动上传 | 插件隐式上传后再审核 | |
 
-**User's choice:** 未显式交互，按执行模式默认采用推荐项。
-**Notes:** 审核通过后统一转换 `asset://<downstream_asset_id>` 供生成接口使用。
+**User's choice:** 显式选择“仅接受公网 URL”，并明确不兼容旧行为。
+**Notes:** 审核通过后统一转换 `asset://<downstream_asset_id>` 供生成接口使用；V2 对 Base64/旧协议直接报错。
 
 ---
 
