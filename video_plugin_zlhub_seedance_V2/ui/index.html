@@ -177,7 +177,17 @@
                 <select id="resolutionSelect">
                     <option value="720p">720p (默认)</option>
                     <option value="480p">480p</option>
+                    <option value="1080p">1080p</option>
                 </select>
+            </div>
+            <div class="hint-text">
+                1080p 仅支持模型 doubao-seedance-2.0。<br />
+                16:9: 1920x1088 / 1920x1080<br />
+                4:3: 1664x1248 / 1664x1248<br />
+                1:1: 1440x1440 / 1440x1440<br />
+                3:4: 1248x1664 / 1248x1664<br />
+                9:16: 1088x1920 / 1080x1920<br />
+                21:9: 2176x928 / 2206x946
             </div>
         </div>
 
@@ -340,6 +350,47 @@
             var retryCountInput = document.getElementById("retryCountInput");
             var btnTaskLog = document.getElementById("btnTaskLog");
             var btnLiveLog = document.getElementById("btnLiveLog");
+            var FAST_MODEL_WITHOUT_1080P = "doubao-seedance-2.0-fast";
+            var RESOLUTION_OPTIONS = [
+                { value: "720p", label: "720p (默认)" },
+                { value: "480p", label: "480p" },
+                { value: "1080p", label: "1080p" },
+            ];
+
+            function getAvailableResolutionsByModel(modelValue) {
+                if (modelValue === FAST_MODEL_WITHOUT_1080P) {
+                    return RESOLUTION_OPTIONS.filter(function (item) {
+                        return item.value !== "1080p";
+                    });
+                }
+                return RESOLUTION_OPTIONS.slice();
+            }
+
+            function syncResolutionOptions(preferredValue, persistAfterSync) {
+                var options = getAvailableResolutionsByModel(modelSelect.value);
+                var current =
+                    preferredValue || resolutionSelect.value || "720p";
+                var previousValue = resolutionSelect.value;
+
+                resolutionSelect.innerHTML = "";
+                options.forEach(function (item) {
+                    var option = document.createElement("option");
+                    option.value = item.value;
+                    option.textContent = item.label;
+                    resolutionSelect.appendChild(option);
+                });
+
+                var hasCurrent = options.some(function (item) {
+                    return item.value === current;
+                });
+                var nextValue = hasCurrent ? current : "720p";
+                var changed = previousValue !== nextValue;
+                resolutionSelect.value = nextValue;
+
+                if (persistAfterSync && (changed || preferredValue)) {
+                    PluginSDK.saveParam("resolution", nextValue);
+                }
+            }
 
             toggleEye.addEventListener("click", function () {
                 if (apiKeyInput.type === "password") {
@@ -388,6 +439,7 @@
 
             modelSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("model", modelSelect.value);
+                syncResolutionOptions(null, true);
             });
             videoStyleSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("video_style", videoStyleSelect.value);
@@ -465,12 +517,11 @@
                 if (params.audit_callback_url)
                     auditCallbackUrlInput.value = params.audit_callback_url;
                 if (params.model) modelSelect.value = params.model;
+                syncResolutionOptions(params.resolution, false);
                 if (params.video_style)
                     videoStyleSelect.value = params.video_style;
                 if (params.audit_test_only != null)
                     auditTestOnlySelect.value = String(params.audit_test_only);
-                if (params.resolution)
-                    resolutionSelect.value = params.resolution;
                 if (params.ratio) ratioSelect.value = params.ratio;
                 if (params.duration != null)
                     durationSelect.value = String(params.duration);

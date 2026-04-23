@@ -68,8 +68,9 @@ DEFAULT_RATIO = "adaptive"
 DEFAULT_DURATION = 5
 DEFAULT_GENERATE_AUDIO = True
 
-DEFAULT_RESOLUTIONS = ["480p", "720p"]
+DEFAULT_RESOLUTIONS = ["480p", "720p", "1080p"]
 DEFAULT_RATIOS = ["adaptive", "16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
+FAST_MODEL_WITHOUT_1080P = "doubao-seedance-2.0-fast"
 DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
 DEFAULT_POLL_INTERVAL = 180
@@ -100,6 +101,14 @@ RESOLUTION_RATIO_MAP = {
         "3:4": (834, 1112),
         "9:16": (720, 1280),
         "21:9": (1470, 630),
+    },
+    "1080p": {
+        "16:9": (1920, 1088),
+        "4:3": (1664, 1248),
+        "1:1": (1440, 1440),
+        "3:4": (1248, 1664),
+        "9:16": (1088, 1920),
+        "21:9": (2176, 928),
     },
 }
 
@@ -415,7 +424,7 @@ def get_info():
     """返回插件元数据"""
     return {
         "name": "TDu&ZLHub Seedance 视频生成 V2",
-        "description": "对接 ZLHub requires2 协议的 Seedance 2.0 视频生成插件。",
+        "description": "对接 ZLHub 第二代协议的 Seedance 2.0 视频生成插件。",
         "version": _PLUGIN_VERSION,
         "author": "Z Code",
     }
@@ -449,10 +458,22 @@ def _build_default_params():
 _default_params = _build_default_params()
 
 
-def _normalize_resolution(value):
+def _get_supported_resolutions(model):
+    normalized_model = _normalize_model(model)
+    if normalized_model == FAST_MODEL_WITHOUT_1080P:
+        return [item for item in DEFAULT_RESOLUTIONS if item != "1080p"]
+    return list(DEFAULT_RESOLUTIONS)
+
+
+def _normalize_resolution(value, model=None):
     resolution = str(value or "").strip().lower()
-    if resolution in DEFAULT_RESOLUTIONS:
+    supported = _get_supported_resolutions(model)
+    if resolution in supported:
         return resolution
+    if DEFAULT_RESOLUTION in supported:
+        return DEFAULT_RESOLUTION
+    if supported:
+        return supported[0]
     return DEFAULT_RESOLUTION
 
 
@@ -925,7 +946,7 @@ def _poll_task_status(
     previous_status = None
 
     attempt = 0
-    while True:
+    while attempt < max_attempts:
         attempt += 1
         trace_id = _new_trace_id()
         headers = _build_auth_headers(
@@ -1054,6 +1075,16 @@ def _poll_task_status(
             )
         time.sleep(poll_interval)
 
+    _log_event(
+        "poll_task.max_attempts_exceeded",
+        task_id=task_id,
+        max_attempts=int(max_attempts),
+        poll_interval=int(poll_interval),
+    )
+    raise PluginFatalError(
+        f"超过最大轮询次数({int(max_attempts)})，任务仍未完成"
+    )
+
 
 def _task_root_from_base_url(base_url):
     _ = base_url
@@ -1114,7 +1145,9 @@ def _sanitize_params(raw_params=None):
     params["config_schema_version"] = CONFIG_SCHEMA_VERSION
 
     params["model"] = _normalize_model(params.get("model"))
-    params["resolution"] = _normalize_resolution(params.get("resolution"))
+    params["resolution"] = _normalize_resolution(
+        params.get("resolution"), params["model"]
+    )
     params["ratio"] = _normalize_aspect_ratio(params.get("ratio"))
     params["duration"] = _normalize_duration(params.get("duration"))
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
