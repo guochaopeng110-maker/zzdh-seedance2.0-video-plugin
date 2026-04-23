@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 TDu&ZLHub Seedance 2.0 视频生成插件。
 对接 ZLHub 中转平台，支持 Seedance 2.0 视频大模型。
@@ -647,17 +647,129 @@ def _guess_mime_type(file_path):
     return mime_type or "application/octet-stream"
 
 
-def _normalize_media_url(media_value, field_name):
+def _ensure_tos_config(params):
+    params = params or {}
+    required_fields = [
+        ("tos_ak", "tos_ak"),
+        ("tos_sk", "tos_sk"),
+        ("tos_endpoint", "tos_endpoint"),
+        ("tos_region", "tos_region"),
+        ("tos_bucket", "tos_bucket"),
+    ]
+    missing = [label for key, label in required_fields if not str(params.get(key, "")).strip()]
+    if missing:
+        raise PluginFatalError(
+            "TOS 配置不完整，缺少: {}。请先配置 TOS，或改用公网 URL".format(
+                ", ".join(missing)
+            )
+        )
+    if tos is None:
+        raise PluginFatalError("缺少 tos SDK，请安装后重试")
+
+
+def _build_tos_public_url(bucket, endpoint, object_key):
+    endpoint_text = str(endpoint or "").strip()
+    endpoint_text = re.sub(r"^https?://", "", endpoint_text, flags=re.IGNORECASE).strip("/")
+    return f"https://{bucket}.{endpoint_text}/{object_key}"
+
+
+def _upload_file_to_tos(local_file_path, params):
+    text_path = str(local_file_path or "").strip()
+    if not text_path:
+        raise PluginFatalError("本地素材路径不能为空")
+    if not os.path.exists(text_path):
+        raise PluginFatalError(f"本地素材不存在: {text_path}")
+
+    _ensure_tos_config(params)
+
+    bucket = str(params.get("tos_bucket", "")).strip()
+    endpoint = str(params.get("tos_endpoint", "")).strip()
+    region = str(params.get("tos_region", "")).strip()
+    ak = str(params.get("tos_ak", "")).strip()
+    sk = str(params.get("tos_sk", "")).strip()
+
+    ext = os.path.splitext(text_path)[1].lower()
+    if not ext:
+        guessed_ext = mimetypes.guess_extension(_guess_mime_type(text_path)) or ".bin"
+        ext = guessed_ext if guessed_ext.startswith(".") else f".{guessed_ext}"
+
+    object_key = f"images/{uuid.uuid4().hex}{ext}"
+    content_type = _guess_mime_type(text_path)
+
+    try:
+        client = tos.TosClientV2(ak=ak, sk=sk, endpoint=endpoint, region=region)
+        with open(text_path, "rb") as fr:
+            file_bytes = fr.read()
+        try:
+            client.put_object(
+                bucket=bucket,
+                key=object_key,
+                content=file_bytes,
+                content_type=content_type,
+            )
+        except TypeError:
+            client.put_object(bucket=bucket, key=object_key, content=file_bytes)
+    except Exception as exc:
+        raise PluginFatalError(f"TOS 上传失败: {exc}") from exc
+
+    return _build_tos_public_url(bucket, endpoint, object_key)
+
+
+def _upload_data_url_to_tos(data_url, params):
+    data_text = str(data_url or "").strip()
+    if not data_text.lower().startswith("data:"):
+        raise PluginFatalError("data URL 格式无效")
+
+    match = re.match(r"^data:([^;,]+)?;base64,(.+)$", data_text, flags=re.IGNORECASE)
+    if not match:
+        raise PluginFatalError("data URL 解析失败，要求 base64 编码")
+
+    mime_type = (match.group(1) or "application/octet-stream").strip().lower()
+    payload_b64 = match.group(2).strip()
+    try:
+        raw_bytes = base64.b64decode(payload_b64, validate=True)
+    except Exception as exc:
+        raise PluginFatalError(f"data URL Base64 解码失败: {exc}") from exc
+
+    tmp_dir = plugin_dir / "tmp_uploads"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    ext = mimetypes.guess_extension(mime_type) or ".bin"
+    if not ext.startswith("."):
+        ext = f".{ext}"
+    temp_path = tmp_dir / f"{uuid.uuid4().hex}{ext}"
+    try:
+        with open(temp_path, "wb") as fw:
+            fw.write(raw_bytes)
+        return _upload_file_to_tos(str(temp_path), params)
+    finally:
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+        except OSError:
+            pass
+
+
+def _normalize_or_upload_media_url(media_value, field_name, params):
     text = str(media_value or "").strip()
     if not text:
         raise PluginFatalError(f"{field_name} 不能为空")
-    # requires2 明确不支持 base64 / 本地路径，统一在插件侧快速失败。
-    if text.lower().startswith("data:") or not (
-        _is_public_url(text) or text.lower().startswith("asset://")
-    ):
-        raise PluginFatalError("不支持base64或本地文件，请提供公网URL")
-    return text
+    lowered = text.lower()
+    if lowered.startswith("asset://"):
+        return text
+    if _is_public_url(text):
+        return text
+    if lowered.startswith("data:"):
+        return _upload_data_url_to_tos(text, params)
+    if os.path.exists(text):
+        return _upload_file_to_tos(text, params)
+    if re.match(r"^[a-zA-Z]:[\\/]", text) or text.startswith(("./", ".\\", "../", "..\\")):
+        raise PluginFatalError(f"{field_name} 本地文件不存在: {text}")
+    raise PluginFatalError(f"{field_name} 不支持该格式，请提供公网 URL、asset://、data: 或本地文件路径")
 
+
+def _normalize_media_url(media_value, field_name):
+    # Backward-compatible wrapper for existing call sites.
+    return _normalize_or_upload_media_url(media_value, field_name, {})
 
 def _call_material_audit_api(
     asset_base_url,
@@ -817,6 +929,7 @@ def _build_content_items(
     reference_images=None,
     reference_videos=None,
     reference_audios=None,
+    params=None,
     role_mode="reference_image",
 ):
     prompt_text = str(prompt or "").strip()
@@ -826,7 +939,7 @@ def _build_content_items(
     content = [{"type": "text", "text": prompt_text}]
 
     for image in _normalize_list_or_single(reference_images):
-        image_url = _normalize_media_url(image, "参考图片")
+        image_url = _normalize_or_upload_media_url(image, "参考图片", params)
         content.append(
             {
                 "type": "image_url",
@@ -836,7 +949,7 @@ def _build_content_items(
         )
 
     for video in _normalize_list_or_single(reference_videos):
-        video_url = _normalize_media_url(video, "参考视频")
+        video_url = _normalize_or_upload_media_url(video, "参考视频", params)
         content.append(
             {
                 "type": "video_url",
@@ -846,7 +959,7 @@ def _build_content_items(
         )
 
     for audio in _normalize_list_or_single(reference_audios):
-        audio_url = _normalize_media_url(audio, "参考音频")
+        audio_url = _normalize_or_upload_media_url(audio, "参考音频", params)
         content.append(
             {
                 "type": "audio_url",
@@ -864,7 +977,7 @@ def _build_create_payload(
     payload = {
         "model": params["model"],
         "content": _build_content_items(
-            prompt, reference_images, reference_videos, reference_audios
+            prompt, reference_images, reference_videos, reference_audios, params=params
         ),
         "generate_audio": bool(params["generate_audio"]),
         "resolution": params["resolution"],
@@ -1326,7 +1439,7 @@ def _run_seedance_orchestration(context):
 
             # V2 审核链路只允许公网 URL，拒绝本地文件和 Base64。
             raw_images = _normalize_list_or_single(reference_images)
-            url_images = [_normalize_media_url(img, "审核参考图") for img in raw_images]
+            url_images = [_normalize_or_upload_media_url(img, "审核参考图", params) for img in raw_images]
 
             # 调用审核接口
             asset_urls, audit_task_id, audit_track_id = _call_material_audit_api(
@@ -1652,3 +1765,4 @@ if __name__ == "__main__":
     if missing:
         raise SystemExit(f"smoke check failed, missing callables: {missing}")
     print("smoke check passed")
+

@@ -135,6 +135,60 @@
         </div>
 
         <div class="form-row">
+            <label class="form-label">TOS Access Key (tos_ak)</label>
+            <div class="form-control">
+                <input
+                    type="password"
+                    id="tosAkInput"
+                    placeholder="用于本地/Base64素材自动上传"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">TOS Secret Key (tos_sk)</label>
+            <div class="form-control">
+                <input
+                    type="password"
+                    id="tosSkInput"
+                    placeholder="用于本地/Base64素材自动上传"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">TOS Endpoint (tos_endpoint)</label>
+            <div class="form-control">
+                <input
+                    type="text"
+                    id="tosEndpointInput"
+                    value="tos-cn-beijing.volces.com"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">TOS Region (tos_region)</label>
+            <div class="form-control">
+                <input type="text" id="tosRegionInput" value="cn-beijing" />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">TOS Bucket (tos_bucket)</label>
+            <div class="form-control">
+                <input
+                    type="text"
+                    id="tosBucketInput"
+                    value="zlhub-asset-outside"
+                />
+            </div>
+            <div class="hint-text">
+                仅在输入本地路径或Base64素材时使用；公网URL输入无需配置。
+            </div>
+        </div>
+
+        <div class="form-row">
             <label class="form-label">Model</label>
             <div class="form-control">
                 <select id="modelSelect">
@@ -157,7 +211,7 @@
                 </select>
             </div>
             <div class="hint-text">
-                仿真人风格仅支持公网 URL 素材（http/https），不支持本地文件与 Base64。
+                仿真人风格会优先走审核链路；本地/Base64素材会先上传TOS再提交审核。
             </div>
         </div>
 
@@ -330,6 +384,11 @@
             var auditCallbackUrlInput = document.getElementById(
                 "auditCallbackUrlInput",
             );
+            var tosAkInput = document.getElementById("tosAkInput");
+            var tosSkInput = document.getElementById("tosSkInput");
+            var tosEndpointInput = document.getElementById("tosEndpointInput");
+            var tosRegionInput = document.getElementById("tosRegionInput");
+            var tosBucketInput = document.getElementById("tosBucketInput");
             var modelSelect = document.getElementById("modelSelect");
             var resolutionSelect = document.getElementById("resolutionSelect");
             var ratioSelect = document.getElementById("ratioSelect");
@@ -436,6 +495,30 @@
                     (auditCallbackUrlInput.value || "").trim(),
                 );
             });
+            tosAkInput.addEventListener("change", function () {
+                PluginSDK.saveParam("tos_ak", (tosAkInput.value || "").trim());
+            });
+            tosSkInput.addEventListener("change", function () {
+                PluginSDK.saveParam("tos_sk", (tosSkInput.value || "").trim());
+            });
+            tosEndpointInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "tos_endpoint",
+                    (tosEndpointInput.value || "").trim(),
+                );
+            });
+            tosRegionInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "tos_region",
+                    (tosRegionInput.value || "").trim(),
+                );
+            });
+            tosBucketInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "tos_bucket",
+                    (tosBucketInput.value || "").trim(),
+                );
+            });
 
             modelSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("model", modelSelect.value);
@@ -516,6 +599,12 @@
                     auditAccessTokenInput.value = params.audit_access_token;
                 if (params.audit_callback_url)
                     auditCallbackUrlInput.value = params.audit_callback_url;
+                if (params.tos_ak) tosAkInput.value = params.tos_ak;
+                if (params.tos_sk) tosSkInput.value = params.tos_sk;
+                if (params.tos_endpoint)
+                    tosEndpointInput.value = params.tos_endpoint;
+                if (params.tos_region) tosRegionInput.value = params.tos_region;
+                if (params.tos_bucket) tosBucketInput.value = params.tos_bucket;
                 if (params.model) modelSelect.value = params.model;
                 syncResolutionOptions(params.resolution, false);
                 if (params.video_style)
