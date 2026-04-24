@@ -71,9 +71,13 @@ _PLUGIN_FILE = __file__
 
 
 # 配置选项（V2 固定 requires2 协议）
-_DEFAULT_API_BASE_URL = "https://api.zlhub.cn"
-_DEFAULT_TASK_CREATE_URL = "https://api.zlhub.cn/v1/task/create"
-_DEFAULT_TASK_QUERY_URL = "https://api.zlhub.cn/v1/task/get"
+_DEFAULT_API_BASE_URL = "https://apihub.tduvr.club"
+_DEFAULT_TASK_CREATE_URL = (
+    "https://apihub.tduvr.club/zlhub/v1/contents/generations/tasks"
+)
+_DEFAULT_TASK_QUERY_URL = (
+    "https://apihub.tduvr.club/zlhub/v1/contents/generations/tasks"
+)
 _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
 _DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
 _DEFAULT_TOS_REGION = "cn-beijing"
@@ -683,10 +687,10 @@ def _safe_progress_callback(progress_callback):
 def get_info():
     """返回插件元数据"""
     return {
-        "name": "TDu&ZLHub Seedance 视频生成 V2",
-        "description": "对接 ZLHub 第二代协议的 Seedance 2.0 视频生成插件。",
+        "name": "TDuHub Seedance 视频生成 V2",
+        "description": "对接 TDuHub 第二代协议的 Seedance 2.0 视频生成插件。",
         "version": _PLUGIN_VERSION,
-        "author": "Z Code",
+        "author": "TDu Developer",
     }
 
 
