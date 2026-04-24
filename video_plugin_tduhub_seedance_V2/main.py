@@ -71,13 +71,9 @@ _PLUGIN_FILE = __file__
 
 
 # 配置选项（V2 固定 requires2 协议）
-_DEFAULT_API_BASE_URL = "https://apihub.tduvr.club"
-_DEFAULT_TASK_CREATE_URL = (
-    "https://apihub.tduvr.club/zlhub/v1/contents/generations/tasks"
-)
-_DEFAULT_TASK_QUERY_URL = (
-    "https://apihub.tduvr.club/zlhub/v1/contents/generations/tasks"
-)
+_DEFAULT_API_BASE_URL = "https://api.zlhub.cn"
+_DEFAULT_TASK_CREATE_URL = f"{_DEFAULT_API_BASE_URL}/v1/task/create"
+_DEFAULT_TASK_QUERY_URL = f"{_DEFAULT_API_BASE_URL}/v1/task/get"
 _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
 _DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
 _DEFAULT_TOS_REGION = "cn-beijing"
@@ -1732,12 +1728,16 @@ def _sanitize_params(raw_params=None):
     params["duration"] = _normalize_duration(params.get("duration"))
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
-    params["base_url"] = _normalize_base_url(
-        params.get("base_url") or _DEFAULT_API_BASE_URL
-    )
-    task_create_url, task_query_url = _build_task_endpoints(params["base_url"])
-    params["task_create_url"] = task_create_url
-    params["task_query_url"] = task_query_url
+    legacy_base_url = _normalize_base_url(params.get("base_url"))
+    if legacy_base_url and legacy_base_url != _DEFAULT_API_BASE_URL:
+        _log_event(
+            "config.source.deprecated_base_url_ignored",
+            legacy_base_url=legacy_base_url,
+            fixed_base_url=_DEFAULT_API_BASE_URL,
+        )
+    params["base_url"] = _DEFAULT_API_BASE_URL
+    params["task_create_url"] = _DEFAULT_TASK_CREATE_URL
+    params["task_query_url"] = _DEFAULT_TASK_QUERY_URL
     params["asset_base_url"] = _DEFAULT_ASSET_BASE_URL
     params["audit_access_token"] = str(params.get("audit_access_token", "")).strip()
     params["audit_callback_url"] = str(params.get("audit_callback_url", "")).strip()

@@ -4,8 +4,8 @@ TDu&ZLHub Seedance 2.0 视频生成插件。
 对接 ZLHub 中转平台，支持 Seedance 2.0 视频大模型。
 """
 
-import collections
 import base64
+import collections
 import io
 import json
 import mimetypes
@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+
 try:
     import tos
 except ImportError:
@@ -71,12 +72,13 @@ _PLUGIN_FILE = __file__
 
 # 配置选项（V2 固定 requires2 协议）
 _DEFAULT_API_BASE_URL = "https://api.zlhub.cn"
-_DEFAULT_TASK_CREATE_URL = "https://api.zlhub.cn/v1/task/create"
-_DEFAULT_TASK_QUERY_URL = "https://api.zlhub.cn/v1/task/get"
+_DEFAULT_TASK_CREATE_URL = f"{_DEFAULT_API_BASE_URL}/v1/task/create"
+_DEFAULT_TASK_QUERY_URL = f"{_DEFAULT_API_BASE_URL}/v1/task/get"
 _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
 _DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
 _DEFAULT_TOS_REGION = "cn-beijing"
 _DEFAULT_TOS_BUCKET = "zlhub-asset-outside"
+
 _TOS_LOCAL_LIB_DIR = plugin_dir / ".deps"
 _TOS_IMPORT_ERROR = None
 
@@ -492,7 +494,13 @@ def _mask_sensitive_value(key, value):
             token = text[7:].strip()
             return f"Bearer {_mask_api_key(token)}"
         return _mask_api_key(text)
-    if key_text in {"x-access-token", "api_key", "audit_access_token", "tos_ak", "tos_sk"}:
+    if key_text in {
+        "x-access-token",
+        "api_key",
+        "audit_access_token",
+        "tos_ak",
+        "tos_sk",
+    }:
         return _mask_api_key(text)
     return value
 
@@ -546,7 +554,14 @@ def _serialize_http_response(response):
     if body_json is None:
         if any(
             text_type in content_type
-            for text_type in ("json", "text", "xml", "html", "javascript", "x-www-form-urlencoded")
+            for text_type in (
+                "json",
+                "text",
+                "xml",
+                "html",
+                "javascript",
+                "x-www-form-urlencoded",
+            )
         ):
             body_text = _truncate_value(getattr(response, "text", ""), max_len=5000)
         else:
@@ -561,7 +576,9 @@ def _serialize_http_response(response):
     }
 
 
-def _persist_interface_trace(interface_name, request_data, response=None, error=None, task_id=None):
+def _persist_interface_trace(
+    interface_name, request_data, response=None, error=None, task_id=None
+):
     trace_payload = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "type": "http_trace",
@@ -592,7 +609,9 @@ def _request_with_trace(
         "headers": dict(headers or {}),
         "params": params,
         "json": json_payload,
-        "data": data if isinstance(data, (str, int, float, bool, type(None))) else "<non-scalar>",
+        "data": data
+        if isinstance(data, (str, int, float, bool, type(None)))
+        else "<non-scalar>",
         "timeout": timeout,
     }
     begin = time.time()
@@ -912,14 +931,20 @@ def _resolve_tos_module():
     install_env = dict(os.environ)
     current_pythonpath = str(install_env.get("PYTHONPATH", "")).strip()
     install_env["PYTHONPATH"] = (
-        f"{local_lib}{os.pathsep}{current_pythonpath}" if current_pythonpath else local_lib
+        f"{local_lib}{os.pathsep}{current_pythonpath}"
+        if current_pythonpath
+        else local_lib
     )
 
     def _run_pip(args, timeout_seconds=120):
-        cmd = [sys.executable, "-m", "pip", "install"] + list(args) + [
-            "--disable-pip-version-check",
-            "--no-warn-script-location",
-        ]
+        cmd = (
+            [sys.executable, "-m", "pip", "install"]
+            + list(args)
+            + [
+                "--disable-pip-version-check",
+                "--no-warn-script-location",
+            ]
+        )
         start_at = time.time()
         try:
             result = subprocess.run(
@@ -964,9 +989,7 @@ def _resolve_tos_module():
 
         # Attempt 1: keep dependencies inside plugin folder first.
         _run_pip(["setuptools", "wheel", "-t", local_lib], timeout_seconds=90)
-        _run_pip(
-            ["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180
-        )
+        _run_pip(["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180)
 
         import tos as imported_tos
 
@@ -990,9 +1013,7 @@ def _resolve_tos_module():
     try:
         # Attempt 2: repair embedded Python build backend, then retry plugin-local install.
         _run_pip(["setuptools", "wheel"], timeout_seconds=120)
-        _run_pip(
-            ["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180
-        )
+        _run_pip(["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180)
 
         import tos as imported_tos
 
@@ -1046,7 +1067,9 @@ def _ensure_tos_config(params):
         ("tos_region", "tos_region"),
         ("tos_bucket", "tos_bucket"),
     ]
-    missing = [label for key, label in required_fields if not str(params.get(key, "")).strip()]
+    missing = [
+        label for key, label in required_fields if not str(params.get(key, "")).strip()
+    ]
     if missing:
         raise PluginFatalError(
             "TOS 配置不完整，缺少: {}。请先配置 TOS，或改用公网 URL".format(
@@ -1064,7 +1087,9 @@ def _ensure_tos_config(params):
 
 def _build_tos_public_url(bucket, endpoint, object_key):
     endpoint_text = str(endpoint or "").strip()
-    endpoint_text = re.sub(r"^https?://", "", endpoint_text, flags=re.IGNORECASE).strip("/")
+    endpoint_text = re.sub(r"^https?://", "", endpoint_text, flags=re.IGNORECASE).strip(
+        "/"
+    )
     return f"https://{bucket}.{endpoint_text}/{object_key}"
 
 
@@ -1157,14 +1182,19 @@ def _normalize_or_upload_media_url(media_value, field_name, params):
         return _upload_data_url_to_tos(text, params)
     if os.path.exists(text):
         return _upload_file_to_tos(text, params)
-    if re.match(r"^[a-zA-Z]:[\\/]", text) or text.startswith(("./", ".\\", "../", "..\\")):
+    if re.match(r"^[a-zA-Z]:[\\/]", text) or text.startswith(
+        ("./", ".\\", "../", "..\\")
+    ):
         raise PluginFatalError(f"{field_name} 本地文件不存在: {text}")
-    raise PluginFatalError(f"{field_name} 不支持该格式，请提供公网 URL、asset://、data: 或本地文件路径")
+    raise PluginFatalError(
+        f"{field_name} 不支持该格式，请提供公网 URL、asset://、data: 或本地文件路径"
+    )
 
 
 def _normalize_media_url(media_value, field_name):
     # Backward-compatible wrapper for existing call sites.
     return _normalize_or_upload_media_url(media_value, field_name, {})
+
 
 def _call_material_audit_api(
     asset_base_url,
@@ -1428,9 +1458,7 @@ def _create_task(api_key, task_create_url, payload, timeout):
         raise PluginFatalError(f"创建任务返回非 JSON 响应: {exc}") from exc
 
     if str(result.get("code") or "").lower() not in {"", "success", "200"}:
-        raise PluginFatalError(
-            f"创建任务失败: {result.get('message') or '未知错误'}"
-        )
+        raise PluginFatalError(f"创建任务失败: {result.get('message') or '未知错误'}")
     data = result.get("data") if isinstance(result.get("data"), dict) else result
     task_id = data.get("id") or data.get("task_id")
     if not task_id:
@@ -1625,9 +1653,7 @@ def _poll_task_status(
         max_attempts=int(max_attempts),
         poll_interval=int(poll_interval),
     )
-    raise PluginFatalError(
-        f"超过最大轮询次数({int(max_attempts)})，任务仍未完成"
-    )
+    raise PluginFatalError(f"超过最大轮询次数({int(max_attempts)})，任务仍未完成")
 
 
 def _task_root_from_base_url(base_url):
@@ -1850,7 +1876,10 @@ def _run_seedance_orchestration(context):
 
             # V2 审核链路只允许公网 URL，拒绝本地文件和 Base64。
             raw_images = _normalize_list_or_single(reference_images)
-            url_images = [_normalize_or_upload_media_url(img, "审核参考图", params) for img in raw_images]
+            url_images = [
+                _normalize_or_upload_media_url(img, "审核参考图", params)
+                for img in raw_images
+            ]
 
             # 调用审核接口
             asset_urls, audit_task_id, audit_track_id = _call_material_audit_api(
@@ -1970,9 +1999,7 @@ def _run_seedance_orchestration(context):
             ),
         )
 
-        task_id, _ = _create_task(
-            api_key, task_create_url, payload, polling["timeout"]
-        )
+        task_id, _ = _create_task(api_key, task_create_url, payload, polling["timeout"])
         _update_task_log(task_log_id, api_task_id=task_id)
         progress_callback("任务已创建")
         initial_poll_delay = int(DEFAULT_INITIAL_POLL_DELAY_SECONDS)
@@ -2176,4 +2203,3 @@ if __name__ == "__main__":
     if missing:
         raise SystemExit(f"smoke check failed, missing callables: {missing}")
     print("smoke check passed")
-

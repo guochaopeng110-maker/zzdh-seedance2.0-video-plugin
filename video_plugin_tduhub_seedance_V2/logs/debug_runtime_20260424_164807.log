@@ -1,0 +1,2 @@
+[2026-04-24 16:48:07] [INFO] module.loaded version=2.0.0
+[2026-04-24 16:48:07] [INFO] [ZLHubSeedance] {"ts": "2026-04-24 16:48:07", "event": "config.source.deprecated_base_url_ignored", "fields": {"legacy_base_url": "https://apihub.tduvr.club", "fixed_base_url": "https://api.zlhub.cn"}}

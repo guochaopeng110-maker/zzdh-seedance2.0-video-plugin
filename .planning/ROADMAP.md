@@ -143,6 +143,16 @@ Plans:
 ---
 *最后更新：2026-04-23*
 
+### Phase 08.2: 固定参数策略与安全治理（URL/TOS/AKSK来源） (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] TBD (run /gsd:plan-phase 08.2 to break down) (completed 2026-04-24)
+
 ### Phase 08.1: 实现参考素材TOS上传并在审核/生成前统一转公网URL (INSERTED)
 
 **Goal:** [Urgent work - to be planned]
