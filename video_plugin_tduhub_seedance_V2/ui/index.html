@@ -61,6 +61,9 @@
         <p class="hint-text">
             对接 TDuHub第二代协议：视频任务 + 素材审核异步链路
         </p>
+        <p class="hint-text">
+            核心接口地址与 TOS 端点由插件固定策略维护，不在前端配置。
+        </p>
         <hr />
 
         <div class="form-row">
@@ -78,7 +81,6 @@
                 </div>
             </div>
         </div>
-
         <div class="form-row">
             <label class="form-label">BaseUrl</label>
             <div class="form-control">
@@ -89,7 +91,6 @@
                 />
             </div>
         </div>
-
         <div class="form-row">
             <label class="form-label">Audit Access Token</label>
             <div class="form-control">
@@ -107,7 +108,7 @@
                 <input
                     type="text"
                     id="auditCallbackUrlInput"
-                    placeholder="暂时不支持,不用填"
+                    placeholder="暂时不支持，不用填"
                 />
             </div>
         </div>
@@ -286,7 +287,6 @@
         <script>
             var apiKeyInput = document.getElementById("apiKeyInput");
             var toggleEye = document.getElementById("toggleEye");
-            var baseUrlInput = document.getElementById("baseUrlInput");
             var auditAccessTokenInput = document.getElementById(
                 "auditAccessTokenInput",
             );
@@ -369,12 +369,6 @@
             // 统一参数保存：确保 UI 与 V2 后端字段严格对齐。
             apiKeyInput.addEventListener("change", function () {
                 PluginSDK.saveParam("api_key", apiKeyInput.value);
-            });
-            baseUrlInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "base_url",
-                    (baseUrlInput.value || "").trim(),
-                );
             });
             auditAccessTokenInput.addEventListener("change", function () {
                 PluginSDK.saveParam(
@@ -460,7 +454,6 @@
 
             PluginSDK.onReady(function (params) {
                 if (params.api_key) apiKeyInput.value = params.api_key;
-                if (params.base_url) baseUrlInput.value = params.base_url;
                 if (params.audit_access_token)
                     auditAccessTokenInput.value = params.audit_access_token;
                 if (params.audit_callback_url)
