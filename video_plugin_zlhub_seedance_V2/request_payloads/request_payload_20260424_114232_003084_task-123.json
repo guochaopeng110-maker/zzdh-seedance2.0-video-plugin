@@ -1,0 +1,31 @@
+{
+  "entries": [
+    {
+      "ts": "2026-04-24 11:42:32",
+      "type": "http_trace",
+      "interface": "query_task_status",
+      "request": {
+        "method": "GET",
+        "url": "https://api.zlhub.cn/v1/task/get/task-123",
+        "headers": {
+          "Authorization": "Bearer te***",
+          "Content-Type": "application/json",
+          "X-Trace-ID": "2df40fe22154491f8939055eddab0610"
+        },
+        "params": null,
+        "json": null,
+        "data": null,
+        "timeout": 30,
+        "elapsed_ms": 0
+      },
+      "response": {
+        "status_code": 200,
+        "headers": {},
+        "body_json": null,
+        "body_text": "<binary content, 0 bytes>",
+        "body_size": 0
+      },
+      "error": null
+    }
+  ]
+}

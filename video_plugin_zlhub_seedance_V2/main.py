@@ -91,6 +91,7 @@ FAST_MODEL_WITHOUT_1080P = "doubao-seedance-2.0-fast"
 DEFAULT_TIMEOUT = 900
 DEFAULT_MAX_POLL_ATTEMPTS = 300
 DEFAULT_POLL_INTERVAL = 180
+DEFAULT_AUDIT_POLL_INTERVAL = 30
 DEFAULT_INITIAL_POLL_DELAY_SECONDS = 180
 CONFIG_SCHEMA_VERSION = 2
 LEGACY_DEFAULT_POLL_INTERVAL = 5
@@ -457,6 +458,18 @@ def _persist_request_payload(payload, task_id=None):
         with open(file_path, "w", encoding="utf-8") as fw:
             fw.write(json.dumps(container, ensure_ascii=False, indent=2))
         return str(file_path)
+
+
+def _start_request_trace_session(task_id=None):
+    global _REQUEST_TRACE_FILE_PATH
+    global _REQUEST_TRACE_ONCE_KEYS
+    with _request_trace_lock:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        suffix = _safe_filename(task_id) if task_id else "pending"
+        _REQUEST_TRACE_FILE_PATH = str(
+            _REQUEST_PAYLOAD_DIR / f"request_payload_{stamp}_{suffix}.json"
+        )
+        _REQUEST_TRACE_ONCE_KEYS = set()
 
 
 _SENSITIVE_KEYS = {
@@ -1804,6 +1817,7 @@ def _run_seedance_orchestration(context):
     output_dir = context.get("output_dir", context.get("project_path", os.getcwd()))
     viewer_index = context.get("viewer_index", 0)
     prompt_text = str(prompt or "")
+    _start_request_trace_session(task_id=f"viewer_{int(viewer_index)}")
 
     task_id = None
     video_url = None
@@ -1842,7 +1856,7 @@ def _run_seedance_orchestration(context):
                 images=url_images,
                 callback_url=params.get("audit_callback_url"),
                 timeout=polling["timeout"],
-                poll_interval=3,
+                poll_interval=DEFAULT_AUDIT_POLL_INTERVAL,
             )
 
             if asset_urls:
