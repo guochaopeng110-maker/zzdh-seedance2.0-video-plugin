@@ -20,10 +20,10 @@ class _AlwaysRunningResponse:
 
 
 def test_poll_task_status_honors_max_attempts(monkeypatch):
-    calls = {"get": 0, "sleep": 0}
+    calls = {"request": 0, "sleep": 0}
 
-    def fake_get(*args, **kwargs):
-        calls["get"] += 1
+    def fake_request(*args, **kwargs):
+        calls["request"] += 1
         return _AlwaysRunningResponse()
 
     def fake_sleep(_seconds):
@@ -31,7 +31,7 @@ def test_poll_task_status_honors_max_attempts(monkeypatch):
         if calls["sleep"] > 3:
             raise RuntimeError("sleep_guard_triggered")
 
-    monkeypatch.setattr(plugin_main.requests, "get", fake_get)
+    monkeypatch.setattr(plugin_main.requests, "request", fake_request)
     monkeypatch.setattr(plugin_main.time, "sleep", fake_sleep)
 
     with pytest.raises(plugin_main.PluginFatalError, match="超过最大轮询次数"):
@@ -45,4 +45,4 @@ def test_poll_task_status_honors_max_attempts(monkeypatch):
             progress_callback=None,
         )
 
-    assert calls["get"] == 3
+    assert calls["request"] == 3

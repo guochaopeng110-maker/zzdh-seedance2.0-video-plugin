@@ -12,6 +12,8 @@ import mimetypes
 import os
 import re
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -49,6 +51,9 @@ _RUNTIME_LOG_FILE_PATH = (
 _log_buffer = collections.deque(maxlen=2000)
 _log_index = 0
 _log_lock = threading.Lock()
+_request_trace_lock = threading.Lock()
+_REQUEST_TRACE_FILE_PATH = None
+_REQUEST_TRACE_ONCE_KEYS = set()
 
 
 class PluginFatalError(Exception):
@@ -71,6 +76,8 @@ _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
 _DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
 _DEFAULT_TOS_REGION = "cn-beijing"
 _DEFAULT_TOS_BUCKET = "zlhub-asset-outside"
+_TOS_LOCAL_LIB_DIR = plugin_dir / ".deps"
+_TOS_IMPORT_ERROR = None
 
 DEFAULT_MODEL = "doubao-seedance-2.0"
 DEFAULT_RESOLUTION = "720p"
@@ -334,7 +341,14 @@ def _manual_download_video(task_row):
         "Accept": "*/*",
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=120)
+        resp = _request_with_trace(
+            method="GET",
+            url=url,
+            headers=headers,
+            timeout=120,
+            interface_name="manual_download_video",
+            task_id=str(task_id or ""),
+        )
         if resp.status_code != 200:
             raise PluginFatalError(f"下载失败: HTTP {resp.status_code}")
         with open(file_path, "wb") as fw:
@@ -416,13 +430,211 @@ def _build_payload_log_snapshot(payload):
 
 
 def _persist_request_payload(payload, task_id=None):
+    global _REQUEST_TRACE_FILE_PATH
     _REQUEST_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    suffix = _safe_filename(task_id) if task_id else "pending"
-    file_path = _REQUEST_PAYLOAD_DIR / f"request_payload_{stamp}_{suffix}.json"
-    with open(file_path, "w", encoding="utf-8") as fw:
-        fw.write(json.dumps(payload or {}, ensure_ascii=False, indent=2))
-    return str(file_path)
+    with _request_trace_lock:
+        if _REQUEST_TRACE_FILE_PATH is None:
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            suffix = _safe_filename(task_id) if task_id else "pending"
+            _REQUEST_TRACE_FILE_PATH = str(
+                _REQUEST_PAYLOAD_DIR / f"request_payload_{stamp}_{suffix}.json"
+            )
+
+        file_path = Path(_REQUEST_TRACE_FILE_PATH)
+        container = {"entries": []}
+        if file_path.exists():
+            try:
+                with open(file_path, "r", encoding="utf-8") as fr:
+                    loaded = json.loads(fr.read() or "{}")
+                    if isinstance(loaded, dict) and isinstance(
+                        loaded.get("entries"), list
+                    ):
+                        container = loaded
+            except Exception:
+                container = {"entries": []}
+
+        container["entries"].append(payload or {})
+        with open(file_path, "w", encoding="utf-8") as fw:
+            fw.write(json.dumps(container, ensure_ascii=False, indent=2))
+        return str(file_path)
+
+
+_SENSITIVE_KEYS = {
+    "authorization",
+    "x-access-token",
+    "api_key",
+    "audit_access_token",
+    "tos_ak",
+    "tos_sk",
+}
+
+
+def _mask_sensitive_value(key, value):
+    key_text = str(key or "").strip().lower()
+    text = str(value or "")
+    if key_text == "authorization":
+        if text.lower().startswith("bearer "):
+            token = text[7:].strip()
+            return f"Bearer {_mask_api_key(token)}"
+        return _mask_api_key(text)
+    if key_text in {"x-access-token", "api_key", "audit_access_token", "tos_ak", "tos_sk"}:
+        return _mask_api_key(text)
+    return value
+
+
+def _sanitize_for_log(value):
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            key_text = str(key or "")
+            key_lc = key_text.lower()
+            if key_lc in _SENSITIVE_KEYS:
+                result[key_text] = _mask_sensitive_value(key_lc, item)
+            else:
+                result[key_text] = _sanitize_for_log(item)
+        return result
+    if isinstance(value, list):
+        return [_sanitize_for_log(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_for_log(item) for item in list(value)]
+    if isinstance(value, str):
+        return _truncate_value(value, max_len=5000)
+    return value
+
+
+def _safe_json_loads(text):
+    try:
+        return json.loads(str(text or ""))
+    except Exception:
+        return None
+
+
+def _serialize_http_response(response):
+    if response is None:
+        return None
+    headers = dict(getattr(response, "headers", {}) or {})
+    content_type = str(headers.get("Content-Type", "")).lower()
+    body_json = None
+    body_text = None
+    body_size = 0
+    try:
+        body_size = len(getattr(response, "content", b"") or b"")
+    except Exception:
+        body_size = 0
+
+    if "json" in content_type:
+        try:
+            body_json = response.json()
+        except Exception:
+            body_json = _safe_json_loads(getattr(response, "text", ""))
+
+    if body_json is None:
+        if any(
+            text_type in content_type
+            for text_type in ("json", "text", "xml", "html", "javascript", "x-www-form-urlencoded")
+        ):
+            body_text = _truncate_value(getattr(response, "text", ""), max_len=5000)
+        else:
+            body_text = f"<binary content, {body_size} bytes>"
+
+    return {
+        "status_code": int(getattr(response, "status_code", 0) or 0),
+        "headers": _sanitize_for_log(headers),
+        "body_json": _sanitize_for_log(body_json) if body_json is not None else None,
+        "body_text": body_text,
+        "body_size": int(body_size),
+    }
+
+
+def _persist_interface_trace(interface_name, request_data, response=None, error=None, task_id=None):
+    trace_payload = {
+        "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "type": "http_trace",
+        "interface": str(interface_name or "unknown"),
+        "request": _sanitize_for_log(request_data or {}),
+        "response": _serialize_http_response(response),
+        "error": _truncate_value(str(error), max_len=5000) if error else None,
+    }
+    return _persist_request_payload(trace_payload, task_id=task_id)
+
+
+def _request_with_trace(
+    method,
+    url,
+    headers=None,
+    params=None,
+    json_payload=None,
+    data=None,
+    timeout=None,
+    interface_name=None,
+    task_id=None,
+    log_once_key=None,
+):
+    global _REQUEST_TRACE_ONCE_KEYS
+    request_meta = {
+        "method": str(method or "").upper(),
+        "url": str(url or ""),
+        "headers": dict(headers or {}),
+        "params": params,
+        "json": json_payload,
+        "data": data if isinstance(data, (str, int, float, bool, type(None))) else "<non-scalar>",
+        "timeout": timeout,
+    }
+    begin = time.time()
+    should_persist = True
+    if log_once_key:
+        with _request_trace_lock:
+            if log_once_key in _REQUEST_TRACE_ONCE_KEYS:
+                should_persist = False
+            else:
+                _REQUEST_TRACE_ONCE_KEYS.add(log_once_key)
+    try:
+        response = requests.request(
+            method=str(method or "").upper(),
+            url=url,
+            headers=headers,
+            params=params,
+            json=json_payload,
+            data=data,
+            timeout=timeout,
+        )
+        elapsed_ms = int((time.time() - begin) * 1000)
+        request_meta["elapsed_ms"] = elapsed_ms
+        trace_file = None
+        if should_persist:
+            trace_file = _persist_interface_trace(
+                interface_name=interface_name,
+                request_data=request_meta,
+                response=response,
+                task_id=task_id,
+            )
+        _log_event(
+            "http.trace",
+            interface=interface_name,
+            status_code=response.status_code,
+            elapsed_ms=elapsed_ms,
+            trace_file=trace_file,
+        )
+        return response
+    except requests.RequestException as exc:
+        elapsed_ms = int((time.time() - begin) * 1000)
+        request_meta["elapsed_ms"] = elapsed_ms
+        trace_file = None
+        if should_persist:
+            trace_file = _persist_interface_trace(
+                interface_name=interface_name,
+                request_data=request_meta,
+                error=exc,
+                task_id=task_id,
+            )
+        _log_event(
+            "http.trace",
+            interface=interface_name,
+            elapsed_ms=elapsed_ms,
+            error=str(exc),
+            trace_file=trace_file,
+        )
+        raise
 
 
 def _safe_progress_callback(progress_callback):
@@ -647,6 +859,160 @@ def _guess_mime_type(file_path):
     return mime_type or "application/octet-stream"
 
 
+def _resolve_tos_module():
+    global tos
+    global _TOS_IMPORT_ERROR
+    if tos is not None:
+        return tos
+
+    try:
+        import tos as imported_tos
+
+        tos = imported_tos
+        return tos
+    except ImportError as exc:
+        _TOS_IMPORT_ERROR = exc
+
+    local_lib = str(_TOS_LOCAL_LIB_DIR)
+    if local_lib not in sys.path:
+        sys.path.insert(0, local_lib)
+    try:
+        import tos as imported_tos
+
+        tos = imported_tos
+        _TOS_IMPORT_ERROR = None
+        return tos
+    except ImportError as exc:
+        _TOS_IMPORT_ERROR = exc
+
+    install_env = dict(os.environ)
+    current_pythonpath = str(install_env.get("PYTHONPATH", "")).strip()
+    install_env["PYTHONPATH"] = (
+        f"{local_lib}{os.pathsep}{current_pythonpath}" if current_pythonpath else local_lib
+    )
+
+    def _run_pip(args, timeout_seconds=120):
+        cmd = [sys.executable, "-m", "pip", "install"] + list(args) + [
+            "--disable-pip-version-check",
+            "--no-warn-script-location",
+        ]
+        start_at = time.time()
+        try:
+            result = subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                env=install_env,
+            )
+            _persist_request_payload(
+                {
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "type": "pip_install_trace",
+                    "command": cmd,
+                    "returncode": int(result.returncode),
+                    "elapsed_ms": int((time.time() - start_at) * 1000),
+                    "stdout": _truncate_value(result.stdout, max_len=8000),
+                    "stderr": _truncate_value(result.stderr, max_len=8000),
+                }
+            )
+            return result
+        except Exception as exc:
+            stdout = getattr(exc, "stdout", "")
+            stderr = getattr(exc, "stderr", "")
+            _persist_request_payload(
+                {
+                    "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "type": "pip_install_trace",
+                    "command": cmd,
+                    "returncode": int(getattr(exc, "returncode", -1)),
+                    "elapsed_ms": int((time.time() - start_at) * 1000),
+                    "stdout": _truncate_value(stdout, max_len=8000),
+                    "stderr": _truncate_value(stderr, max_len=8000),
+                    "error": _truncate_value(str(exc), max_len=4000),
+                }
+            )
+            raise
+
+    try:
+        _TOS_LOCAL_LIB_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Attempt 1: keep dependencies inside plugin folder first.
+        _run_pip(["setuptools", "wheel", "-t", local_lib], timeout_seconds=90)
+        _run_pip(
+            ["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180
+        )
+
+        import tos as imported_tos
+
+        tos = imported_tos
+        _TOS_IMPORT_ERROR = None
+        _log_event("tos_sdk.autoinstall.success", mode="plugin_local", target=local_lib)
+        return tos
+    except Exception as first_exc:
+        first_detail = str(first_exc)
+        if isinstance(first_exc, subprocess.CalledProcessError):
+            first_detail = (
+                f"{first_detail}; stderr={str(first_exc.stderr or '').strip()[:1000]}"
+            )
+        _log_event(
+            "tos_sdk.autoinstall.retry",
+            mode="plugin_local_failed",
+            error=first_detail,
+            target=local_lib,
+        )
+
+    try:
+        # Attempt 2: repair embedded Python build backend, then retry plugin-local install.
+        _run_pip(["setuptools", "wheel"], timeout_seconds=120)
+        _run_pip(
+            ["tos", "--no-build-isolation", "-t", local_lib], timeout_seconds=180
+        )
+
+        import tos as imported_tos
+
+        tos = imported_tos
+        _TOS_IMPORT_ERROR = None
+        _log_event(
+            "tos_sdk.autoinstall.success",
+            mode="global_backend_then_plugin_local",
+            target=local_lib,
+        )
+        return tos
+    except Exception as second_exc:
+        second_detail = str(second_exc)
+        if isinstance(second_exc, subprocess.CalledProcessError):
+            second_detail = (
+                f"{second_detail}; stderr={str(second_exc.stderr or '').strip()[:1000]}"
+            )
+        _log_event(
+            "tos_sdk.autoinstall.retry",
+            mode="global_backend_failed",
+            error=second_detail,
+            target=local_lib,
+        )
+
+    try:
+        # Attempt 3: final fallback, install tos into embedded runtime directly.
+        _run_pip(["tos"], timeout_seconds=240)
+        import tos as imported_tos
+
+        tos = imported_tos
+        _TOS_IMPORT_ERROR = None
+        _log_event("tos_sdk.autoinstall.success", mode="global_tos", target=local_lib)
+        return tos
+    except Exception as final_exc:
+        final_detail = str(final_exc)
+        if isinstance(final_exc, subprocess.CalledProcessError):
+            final_detail = (
+                f"{final_detail}; stderr={str(final_exc.stderr or '').strip()[:1500]}"
+            )
+        _TOS_IMPORT_ERROR = Exception(final_detail)
+        _log_event("tos_sdk.autoinstall.failed", error=final_detail, target=local_lib)
+        return None
+
+
 def _ensure_tos_config(params):
     params = params or {}
     required_fields = [
@@ -663,8 +1029,13 @@ def _ensure_tos_config(params):
                 ", ".join(missing)
             )
         )
-    if tos is None:
-        raise PluginFatalError("缺少 tos SDK，请安装后重试")
+    if _resolve_tos_module() is None:
+        detail = str(_TOS_IMPORT_ERROR) if _TOS_IMPORT_ERROR else "未知原因"
+        raise PluginFatalError(
+            "缺少 tos SDK，且自动安装失败。可手动执行: "
+            f"`{sys.executable} -m pip install tos`。"
+            f" 详细信息: {detail}"
+        )
 
 
 def _build_tos_public_url(bucket, endpoint, object_key):
@@ -806,13 +1177,16 @@ def _call_material_audit_api(
         image_count=len(image_list),
     )
     try:
-        response = requests.post(
-            submit_endpoint,
+        response = _request_with_trace(
+            method="POST",
+            url=submit_endpoint,
             headers=_build_audit_headers(
                 audit_access_token, include_content_type=True, track_id=submit_track_id
             ),
-            json=request_payload,
+            json_payload=request_payload,
             timeout=request_timeout,
+            interface_name="audit_submit_async",
+            task_id=None,
         )
     except requests.RequestException as exc:
         raise PluginFatalError(f"素材审核请求失败: {exc}") from exc
@@ -845,14 +1219,17 @@ def _call_material_audit_api(
             track_id=query_track_id,
         )
         try:
-            query_response = requests.get(
-                query_endpoint,
+            query_response = _request_with_trace(
+                method="GET",
+                url=query_endpoint,
                 headers=_build_audit_headers(
                     audit_access_token,
                     include_content_type=False,
                     track_id=query_track_id,
                 ),
                 timeout=query_timeout,
+                interface_name="audit_query_task",
+                task_id=task_id,
             )
         except requests.RequestException as exc:
             if attempt >= max_attempts:
@@ -1006,13 +1383,15 @@ def _create_task(api_key, task_create_url, payload, timeout):
         api_key=_mask_api_key(api_key),
         trace_id=trace_id,
     )
-    response = requests.post(
-        endpoint,
+    response = _request_with_trace(
+        method="POST",
+        url=endpoint,
         headers=_build_auth_headers(
             api_key, include_content_type=True, trace_id=trace_id
         ),
-        json=payload,
+        json_payload=payload,
         timeout=timeout,
+        interface_name="create_task",
     )
     if response.status_code != 200:
         raise PluginFatalError(
@@ -1106,7 +1485,15 @@ def _poll_task_status(
         )
 
         try:
-            response = requests.get(endpoint, headers=headers, timeout=timeout)
+            response = _request_with_trace(
+                method="GET",
+                url=endpoint,
+                headers=headers,
+                timeout=timeout,
+                interface_name="query_task_status",
+                task_id=str(task_id),
+                log_once_key=f"query_task_status:{str(task_id)}",
+            )
         except requests.RequestException as exc:
             _log_event(
                 "poll_task.query_error",
@@ -1242,7 +1629,14 @@ def _download_video(api_key, task_query_url, task_id, video_url, output_path, ti
         tried.append(target_url)
         _log_event("download.try", task_id=task_id, url=target_url)
         try:
-            response = requests.get(target_url, headers=headers, timeout=timeout)
+            response = _request_with_trace(
+                method="GET",
+                url=target_url,
+                headers=headers,
+                timeout=timeout,
+                interface_name="download_video",
+                task_id=str(task_id),
+            )
             if response.status_code == 200:
                 output_dir = os.path.dirname(output_path)
                 if output_dir:
