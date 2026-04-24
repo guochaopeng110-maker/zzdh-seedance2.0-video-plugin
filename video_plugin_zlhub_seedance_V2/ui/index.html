@@ -59,7 +59,7 @@
     <body>
         <h3>TDu&ZLHub Seedance 视频生成插件 V2</h3>
         <p class="hint-text">
-            对接 ZLHub requires2 协议：视频任务 + 素材审核异步链路
+            对接 ZLHub第二代协议：视频任务 + 素材审核异步链路
         </p>
         <hr />
 
@@ -80,34 +80,12 @@
         </div>
 
         <div class="form-row">
-            <label class="form-label">任务创建地址 (task_create_url)</label>
+            <label class="form-label">BaseUrl</label>
             <div class="form-control">
                 <input
                     type="text"
-                    id="taskCreateUrlInput"
-                    value="https://api.zlhub.cn/v1/task/create"
-                />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">任务查询地址 (task_query_url)</label>
-            <div class="form-control">
-                <input
-                    type="text"
-                    id="taskQueryUrlInput"
-                    value="https://api.zlhub.cn/v1/task/get"
-                />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">素材审核域名 (asset_base_url)</label>
-            <div class="form-control">
-                <input
-                    type="text"
-                    id="assetBaseUrlInput"
-                    value="https://asset.zlhub.cn"
+                    id="baseUrlInput"
+                    value="https://api.zlhub.cn"
                 />
             </div>
         </div>
@@ -129,62 +107,8 @@
                 <input
                     type="text"
                     id="auditCallbackUrlInput"
-                    placeholder="https://your-domain.com/api/callback"
+                    placeholder="暂时不支持"
                 />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">TOS Access Key (tos_ak)</label>
-            <div class="form-control">
-                <input
-                    type="password"
-                    id="tosAkInput"
-                    placeholder="用于本地/Base64素材自动上传"
-                />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">TOS Secret Key (tos_sk)</label>
-            <div class="form-control">
-                <input
-                    type="password"
-                    id="tosSkInput"
-                    placeholder="用于本地/Base64素材自动上传"
-                />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">TOS Endpoint (tos_endpoint)</label>
-            <div class="form-control">
-                <input
-                    type="text"
-                    id="tosEndpointInput"
-                    value="tos-cn-beijing.volces.com"
-                />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">TOS Region (tos_region)</label>
-            <div class="form-control">
-                <input type="text" id="tosRegionInput" value="cn-beijing" />
-            </div>
-        </div>
-
-        <div class="form-row">
-            <label class="form-label">TOS Bucket (tos_bucket)</label>
-            <div class="form-control">
-                <input
-                    type="text"
-                    id="tosBucketInput"
-                    value="zlhub-asset-outside"
-                />
-            </div>
-            <div class="hint-text">
-                仅在输入本地路径或Base64素材时使用；公网URL输入无需配置。
             </div>
         </div>
 
@@ -210,9 +134,6 @@
                     <option value="仿真人风格">仿真人风格 (触发审核)</option>
                 </select>
             </div>
-            <div class="hint-text">
-                仿真人风格会优先走审核链路；本地/Base64素材会先上传TOS再提交审核。
-            </div>
         </div>
 
         <div class="form-row">
@@ -220,7 +141,9 @@
             <div class="form-control">
                 <select id="auditTestOnlySelect">
                     <option value="false" selected>关闭（正常生成视频）</option>
-                    <option value="true">开启（仅跑 requires2 审核链路）</option>
+                    <option value="true">
+                        开启（仅跑审核链路，不生产视频）
+                    </option>
                 </select>
             </div>
         </div>
@@ -236,12 +159,6 @@
             </div>
             <div class="hint-text">
                 1080p 仅支持模型 doubao-seedance-2.0。<br />
-                16:9: 1920x1088 / 1920x1080<br />
-                4:3: 1664x1248 / 1664x1248<br />
-                1:1: 1440x1440 / 1440x1440<br />
-                3:4: 1248x1664 / 1248x1664<br />
-                9:16: 1088x1920 / 1080x1920<br />
-                21:9: 2176x928 / 2206x946
             </div>
         </div>
 
@@ -375,20 +292,13 @@
         <script>
             var apiKeyInput = document.getElementById("apiKeyInput");
             var toggleEye = document.getElementById("toggleEye");
-            var taskCreateUrlInput = document.getElementById("taskCreateUrlInput");
-            var taskQueryUrlInput = document.getElementById("taskQueryUrlInput");
-            var assetBaseUrlInput = document.getElementById("assetBaseUrlInput");
+            var baseUrlInput = document.getElementById("baseUrlInput");
             var auditAccessTokenInput = document.getElementById(
                 "auditAccessTokenInput",
             );
             var auditCallbackUrlInput = document.getElementById(
                 "auditCallbackUrlInput",
             );
-            var tosAkInput = document.getElementById("tosAkInput");
-            var tosSkInput = document.getElementById("tosSkInput");
-            var tosEndpointInput = document.getElementById("tosEndpointInput");
-            var tosRegionInput = document.getElementById("tosRegionInput");
-            var tosBucketInput = document.getElementById("tosBucketInput");
             var modelSelect = document.getElementById("modelSelect");
             var resolutionSelect = document.getElementById("resolutionSelect");
             var ratioSelect = document.getElementById("ratioSelect");
@@ -405,7 +315,8 @@
             var maxPollAttemptsInput = document.getElementById(
                 "maxPollAttemptsInput",
             );
-            var pollIntervalInput = document.getElementById("pollIntervalInput");
+            var pollIntervalInput =
+                document.getElementById("pollIntervalInput");
             var retryCountInput = document.getElementById("retryCountInput");
             var btnTaskLog = document.getElementById("btnTaskLog");
             var btnLiveLog = document.getElementById("btnLiveLog");
@@ -465,22 +376,10 @@
             apiKeyInput.addEventListener("change", function () {
                 PluginSDK.saveParam("api_key", apiKeyInput.value);
             });
-            taskCreateUrlInput.addEventListener("change", function () {
+            baseUrlInput.addEventListener("change", function () {
                 PluginSDK.saveParam(
-                    "task_create_url",
-                    (taskCreateUrlInput.value || "").trim(),
-                );
-            });
-            taskQueryUrlInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "task_query_url",
-                    (taskQueryUrlInput.value || "").trim(),
-                );
-            });
-            assetBaseUrlInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "asset_base_url",
-                    (assetBaseUrlInput.value || "").trim(),
+                    "base_url",
+                    (baseUrlInput.value || "").trim(),
                 );
             });
             auditAccessTokenInput.addEventListener("change", function () {
@@ -495,31 +394,6 @@
                     (auditCallbackUrlInput.value || "").trim(),
                 );
             });
-            tosAkInput.addEventListener("change", function () {
-                PluginSDK.saveParam("tos_ak", (tosAkInput.value || "").trim());
-            });
-            tosSkInput.addEventListener("change", function () {
-                PluginSDK.saveParam("tos_sk", (tosSkInput.value || "").trim());
-            });
-            tosEndpointInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "tos_endpoint",
-                    (tosEndpointInput.value || "").trim(),
-                );
-            });
-            tosRegionInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "tos_region",
-                    (tosRegionInput.value || "").trim(),
-                );
-            });
-            tosBucketInput.addEventListener("change", function () {
-                PluginSDK.saveParam(
-                    "tos_bucket",
-                    (tosBucketInput.value || "").trim(),
-                );
-            });
-
             modelSelect.addEventListener("change", function () {
                 PluginSDK.saveParam("model", modelSelect.value);
                 syncResolutionOptions(null, true);
@@ -540,7 +414,10 @@
                 PluginSDK.saveParam("ratio", ratioSelect.value);
             });
             durationSelect.addEventListener("change", function () {
-                PluginSDK.saveParam("duration", parseInt(durationSelect.value, 10));
+                PluginSDK.saveParam(
+                    "duration",
+                    parseInt(durationSelect.value, 10),
+                );
             });
             generateAudioSelect.addEventListener("change", function () {
                 PluginSDK.saveParam(
@@ -589,22 +466,11 @@
 
             PluginSDK.onReady(function (params) {
                 if (params.api_key) apiKeyInput.value = params.api_key;
-                if (params.task_create_url)
-                    taskCreateUrlInput.value = params.task_create_url;
-                if (params.task_query_url)
-                    taskQueryUrlInput.value = params.task_query_url;
-                if (params.asset_base_url)
-                    assetBaseUrlInput.value = params.asset_base_url;
+                if (params.base_url) baseUrlInput.value = params.base_url;
                 if (params.audit_access_token)
                     auditAccessTokenInput.value = params.audit_access_token;
                 if (params.audit_callback_url)
                     auditCallbackUrlInput.value = params.audit_callback_url;
-                if (params.tos_ak) tosAkInput.value = params.tos_ak;
-                if (params.tos_sk) tosSkInput.value = params.tos_sk;
-                if (params.tos_endpoint)
-                    tosEndpointInput.value = params.tos_endpoint;
-                if (params.tos_region) tosRegionInput.value = params.tos_region;
-                if (params.tos_bucket) tosBucketInput.value = params.tos_bucket;
                 if (params.model) modelSelect.value = params.model;
                 syncResolutionOptions(params.resolution, false);
                 if (params.video_style)

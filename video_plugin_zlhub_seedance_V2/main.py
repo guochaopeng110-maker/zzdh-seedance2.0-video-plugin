@@ -70,6 +70,7 @@ _PLUGIN_FILE = __file__
 
 
 # 配置选项（V2 固定 requires2 协议）
+_DEFAULT_API_BASE_URL = "https://api.zlhub.cn"
 _DEFAULT_TASK_CREATE_URL = "https://api.zlhub.cn/v1/task/create"
 _DEFAULT_TASK_QUERY_URL = "https://api.zlhub.cn/v1/task/get"
 _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
@@ -146,6 +147,7 @@ def _build_params_log_snapshot(params):
     return {
         "api_key_masked": _mask_api_key(api_key),
         "api_key_present": bool(api_key),
+        "base_url": params.get("base_url"),
         "task_create_url": params.get("task_create_url"),
         "task_query_url": params.get("task_query_url"),
         "asset_base_url": params.get("asset_base_url"),
@@ -675,6 +677,7 @@ def _build_default_params():
     return {
         "config_schema_version": CONFIG_SCHEMA_VERSION,
         "api_key": "",
+        "base_url": _DEFAULT_API_BASE_URL,
         "task_create_url": _DEFAULT_TASK_CREATE_URL,
         "task_query_url": _DEFAULT_TASK_QUERY_URL,
         "asset_base_url": _DEFAULT_ASSET_BASE_URL,
@@ -803,6 +806,14 @@ def _validate_image_constraints(image_path):
 
 def _normalize_base_url(url):
     return str(url or "").strip().rstrip("/")
+
+
+def _build_task_endpoints(base_url):
+    base = _normalize_base_url(base_url or _DEFAULT_API_BASE_URL)
+    return (
+        f"{base}/v1/task/create",
+        f"{base}/v1/task/get",
+    )
 
 
 def _is_remote_or_asset(value):
@@ -1692,28 +1703,20 @@ def _sanitize_params(raw_params=None):
     params["duration"] = _normalize_duration(params.get("duration"))
     params["generate_audio"] = _normalize_audio_generation(params.get("generate_audio"))
     params["web_search"] = _normalize_web_search(params.get("web_search"))
-    params["task_create_url"] = _normalize_base_url(
-        params.get("task_create_url") or _DEFAULT_TASK_CREATE_URL
+    params["base_url"] = _normalize_base_url(
+        params.get("base_url") or _DEFAULT_API_BASE_URL
     )
-    params["task_query_url"] = _normalize_base_url(
-        params.get("task_query_url") or _DEFAULT_TASK_QUERY_URL
-    )
-    params["asset_base_url"] = _normalize_base_url(
-        params.get("asset_base_url") or _DEFAULT_ASSET_BASE_URL
-    )
+    task_create_url, task_query_url = _build_task_endpoints(params["base_url"])
+    params["task_create_url"] = task_create_url
+    params["task_query_url"] = task_query_url
+    params["asset_base_url"] = _DEFAULT_ASSET_BASE_URL
     params["audit_access_token"] = str(params.get("audit_access_token", "")).strip()
     params["audit_callback_url"] = str(params.get("audit_callback_url", "")).strip()
     params["tos_ak"] = str(params.get("tos_ak", "")).strip()
     params["tos_sk"] = str(params.get("tos_sk", "")).strip()
-    params["tos_endpoint"] = str(
-        params.get("tos_endpoint", _DEFAULT_TOS_ENDPOINT) or _DEFAULT_TOS_ENDPOINT
-    ).strip().rstrip("/")
-    params["tos_region"] = str(
-        params.get("tos_region", _DEFAULT_TOS_REGION) or _DEFAULT_TOS_REGION
-    ).strip()
-    params["tos_bucket"] = str(
-        params.get("tos_bucket", _DEFAULT_TOS_BUCKET) or _DEFAULT_TOS_BUCKET
-    ).strip()
+    params["tos_endpoint"] = _DEFAULT_TOS_ENDPOINT
+    params["tos_region"] = _DEFAULT_TOS_REGION
+    params["tos_bucket"] = _DEFAULT_TOS_BUCKET
     style = str(params.get("video_style", "其他风格") or "").strip()
     style_lc = style.lower()
     if (
