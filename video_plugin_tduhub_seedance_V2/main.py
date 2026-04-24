@@ -1734,9 +1734,9 @@ def _sanitize_params(raw_params=None):
     params["base_url"] = _normalize_base_url(
         params.get("base_url") or _DEFAULT_API_BASE_URL
     )
-    task_create_url, task_query_url = _build_task_endpoints(params["base_url"])
-    params["task_create_url"] = task_create_url
-    params["task_query_url"] = task_query_url
+    # V2 任务接口固定，不再从 base_url 派生旧版 /v1/task/* 端点。
+    params["task_create_url"] = _DEFAULT_TASK_CREATE_URL
+    params["task_query_url"] = _DEFAULT_TASK_QUERY_URL
     params["asset_base_url"] = _DEFAULT_ASSET_BASE_URL
     params["audit_access_token"] = str(params.get("audit_access_token", "")).strip()
     params["audit_callback_url"] = str(params.get("audit_callback_url", "")).strip()
