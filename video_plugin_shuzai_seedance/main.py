@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
+from urllib.parse import urlparse
 
 try:
     from plugin_utils import load_plugin_config, save_plugin_config
@@ -89,6 +90,22 @@ def _mask_api_key(value):
     if len(text) <= 8:
         return f"{text[:2]}***"
     return f"{text[:4]}***{text[-2:]}"
+
+
+def _sanitize_headers_for_debug(headers):
+    safe = {}
+    for key, value in (headers or {}).items():
+        k = str(key or "")
+        v = str(value or "")
+        if k.lower() == "authorization":
+            parts = v.split(" ", 1)
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                safe[k] = f"Bearer {_mask_api_key(parts[1])}"
+            else:
+                safe[k] = "***"
+        else:
+            safe[k] = v
+    return safe
 
 
 def _append_live_log(level, message):
@@ -604,6 +621,7 @@ def _extract_failure_reason_from_status(task_data):
 def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_interval, progress_callback=None):
     endpoint = _build_task_query_url(base_url, task_id)
     headers = _build_auth_headers(api_key, include_content_type=True)
+    parsed_endpoint = urlparse(endpoint)
     previous_status = None
 
     for attempt in range(1, int(max_attempts) + 1):
@@ -620,6 +638,13 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
                     "task_id": str(task_id),
                     "attempt": int(attempt),
                     "endpoint": endpoint,
+                    "request": {
+                        "method": "GET",
+                        "url": endpoint,
+                        "path": parsed_endpoint.path or "/",
+                        "query": parsed_endpoint.query or "",
+                        "headers": _sanitize_headers_for_debug(headers),
+                    },
                     "status_code": int(response.status_code),
                     "raw_status_candidates": {
                         "status": data.get("status") if isinstance(data, dict) else None,
