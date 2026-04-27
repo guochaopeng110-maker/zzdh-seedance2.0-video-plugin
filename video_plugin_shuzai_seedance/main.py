@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Shuzai Seedance 2.0 视频生成插件
 """
@@ -265,7 +265,7 @@ def _persist_request_payload(payload, task_id=None):
 def _manual_download_video(task_row):
     url = task_row.get("video_url")
     if not url:
-        return {"id": task_row.get("id"), "status": "manual_failed", "error": "任务无 video_url"}
+        return {"id": task_row.get("id"), "status": "manual_failed", "error": "缺少 video_url"}
     _MANUAL_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     base_name = _safe_filename(task_row.get("api_task_id") or f"task_{task_row.get('id')}")
     file_path = _MANUAL_DOWNLOAD_DIR / f"{base_name}.mp4"
@@ -281,7 +281,6 @@ def _manual_download_video(task_row):
     except Exception as exc:
         _update_task_log(task_row.get("id"), status="manual_failed", error=str(exc))
         return {"id": task_row.get("id"), "status": "manual_failed", "error": str(exc)}
-
 
 def _safe_progress_callback(progress_callback):
     if callable(progress_callback):
@@ -359,7 +358,6 @@ def _validate_image_constraints(image_path):
     if os.path.getsize(path_text) >= MAX_IMAGE_SIZE_BYTES:
         raise PluginFatalError("图片大小超过 30MB 限制")
 
-
 def _build_auth_headers(api_key, include_content_type=True):
     key_text = str(api_key or "").strip()
     if not key_text:
@@ -373,9 +371,8 @@ def _build_auth_headers(api_key, include_content_type=True):
 def _ensure_success_response(response, operation_name):
     if response.status_code != 200:
         raise PluginFatalError(
-            f"{operation_name}失败: HTTP {response.status_code} - {response.text}"
+            f"{operation_name}??: HTTP {response.status_code} - {response.text}"
         )
-
 
 def _normalize_list_or_single(value):
     if value is None:
@@ -401,11 +398,10 @@ def _path_or_url_to_payload_value(value):
     if text.lower().startswith(("http://", "https://", "data:")):
         return text
     if not os.path.exists(text):
-        raise PluginFatalError(f"参考素材不存在: {text}")
+        raise PluginFatalError(f"参考图片不存在: {text}")
     with open(text, "rb") as fp:
         encoded = base64.b64encode(fp.read()).decode("utf-8")
     return f"data:{_guess_mime_type(text)};base64,{encoded}"
-
 
 def _build_create_payload(params, prompt, reference_images=None, reference_videos=None, reference_audios=None):
     prompt_text = str(prompt or "").strip()
@@ -437,7 +433,6 @@ def _build_create_payload(params, prompt, reference_images=None, reference_video
         "seconds": str(int(params["duration"])),
         "metadata": metadata,
     }
-
 
 def _extract_task_id(result):
     if not isinstance(result, dict):
@@ -473,7 +468,6 @@ def _create_task(api_key, base_url, payload, timeout):
         raise PluginFatalError("创建任务失败: 响应中缺少 task_id/id")
     _log_event("create_task.success", task_id=task_id)
     return str(task_id), result
-
 
 def _normalize_task_status(raw_status):
     status = str(raw_status or "").strip().lower()
@@ -547,6 +541,65 @@ def _extract_video_url_from_status(task_data):
                 return output.get("url")
     return task_data.get("video_url") or task_data.get("url")
 
+def _extract_failure_reason_from_status(task_data):
+    if not isinstance(task_data, dict):
+        return "未知原因"
+
+    def _stringify_reason(value):
+        if isinstance(value, dict):
+            msg = value.get("message") or value.get("msg") or value.get("detail")
+            code = value.get("code")
+            if msg and code:
+                return f"{msg} (code={code})"
+            if msg:
+                return str(msg)
+            if code:
+                return str(code)
+            return ""
+        return str(value or "").strip()
+
+    def _is_likely_url(text):
+        lowered = str(text or "").strip().lower()
+        return lowered.startswith("http://") or lowered.startswith("https://")
+
+    candidates = [
+        task_data.get("fail_reason"),
+        task_data.get("reason"),
+        task_data.get("error"),
+        task_data.get("message"),
+    ]
+
+    top_data = task_data.get("data")
+    if isinstance(top_data, dict):
+        candidates.extend(
+            [
+                top_data.get("fail_reason"),
+                top_data.get("reason"),
+                top_data.get("error"),
+                top_data.get("message"),
+            ]
+        )
+
+        result_url = top_data.get("result_url")
+        if result_url and not _is_likely_url(result_url):
+            candidates.append(result_url)
+
+        nested_data = top_data.get("data")
+        if isinstance(nested_data, dict):
+            candidates.extend(
+                [
+                    nested_data.get("fail_reason"),
+                    nested_data.get("reason"),
+                    nested_data.get("message"),
+                    nested_data.get("error"),
+                ]
+            )
+
+    for item in candidates:
+        text = _stringify_reason(item)
+        if text:
+            return text
+    return "未知原因"
 
 def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_interval, progress_callback=None):
     endpoint = _build_task_query_url(base_url, task_id)
@@ -560,7 +613,6 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
             _ensure_success_response(response, "查询任务状态")
             data = response.json()
 
-            # Query response snapshot for debugging parser mismatch.
             _persist_request_payload(
                 {
                     "type": "poll_task_response",
@@ -598,13 +650,17 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
         except json.JSONDecodeError as exc:
             _log_event("poll_task.query_error", attempt=attempt, error=str(exc))
             if progress_callback:
-                progress_callback(f"状态查询返回非 JSON，第 {attempt} 次将在 {int(poll_interval)} 秒后重试")
+                progress_callback(
+                    f"查询任务状态响应 JSON 解析失败，第 {attempt} 次，{int(poll_interval)} 秒后重试"
+                )
             time.sleep(poll_interval)
             continue
         except Exception as exc:
             _log_event("poll_task.query_error", attempt=attempt, error=str(exc))
             if progress_callback:
-                progress_callback(f"状态查询失败，第 {attempt} 次将在 {int(poll_interval)} 秒后重试")
+                progress_callback(
+                    f"查询任务状态异常，第 {attempt} 次，{int(poll_interval)} 秒后重试"
+                )
             time.sleep(poll_interval)
             continue
 
@@ -622,7 +678,7 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
 
         if status == "running":
             if progress_callback:
-                progress_callback(f"任务进行中(第 {attempt} 次查询)")
+                progress_callback(f"任务状态轮询中，第 {attempt} 次")
             time.sleep(poll_interval)
             continue
 
@@ -630,32 +686,27 @@ def _poll_task_status(api_key, base_url, task_id, timeout, max_attempts, poll_in
             return data, _extract_video_url_from_status(data)
 
         if status == "failed":
-            reason = (
-                data.get("fail_reason")
-                or data.get("reason")
-                or data.get("message")
-                or data.get("error")
-                or "未知原因"
-            )
+            reason = _extract_failure_reason_from_status(data)
             raise PluginFatalError(f"任务失败: {reason}")
 
         _log_event("poll_task.unknown_retry", task_id=task_id, attempt=attempt, raw_status=raw_status)
         if progress_callback:
-            progress_callback(f"任务状态未知({raw_status})，将在 {int(poll_interval)} 秒后继续查询")
+            progress_callback(
+                f"任务状态未知({raw_status})，将在 {int(poll_interval)} 秒后继续轮询"
+            )
         time.sleep(poll_interval)
 
-    raise PluginFatalError("超过最大轮询次数，任务状态仍未完成")
-
+    raise PluginFatalError(f"超过最大轮询次数({int(max_attempts)})，任务仍未完成")
 
 def _download_video(video_url, output_path, timeout):
     target_url = str(video_url or "").strip()
     if not target_url:
-        raise PluginFatalError("下载视频失败: 任务结果未返回 url")
+        raise PluginFatalError("下载视频失败: 缺少可下载 url")
     headers = {"User-Agent": DOWNLOAD_USER_AGENT, "Referer": DOWNLOAD_REFERER, "Accept": "*/*"}
     _log_event("download.try", url=target_url)
     response = requests.get(target_url, headers=headers, timeout=timeout)
     if response.status_code != 200:
-        raise PluginFatalError(f"下载失败: HTTP {response.status_code}")
+        raise PluginFatalError(f"下载视频失败: HTTP {response.status_code}")
     output_dir = os.path.dirname(output_path)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -663,7 +714,6 @@ def _download_video(video_url, output_path, timeout):
         video_file.write(response.content)
     _log_event("download.success", output_path=output_path)
     return output_path
-
 
 def _build_params_log_snapshot(params):
     params = params or {}
@@ -738,7 +788,6 @@ def _normalize_terminal_status(status, error=None):
     if error and "超过最大轮询次数" in str(error):
         return "timeout"
     return "failed"
-
 
 def _build_orchestration_result(task_id=None, status="failed", output_path=None, video_url=None, error=None, meta=None):
     error_text = None
@@ -819,9 +868,11 @@ def _run_seedance_orchestration(context):
         progress_callback("任务已创建")
 
         if DEFAULT_INITIAL_POLL_DELAY_SECONDS > 0:
-            progress_callback(f"任务已创建，等待 {DEFAULT_INITIAL_POLL_DELAY_SECONDS} 秒后开始状态轮询")
+            progress_callback(
+                f"等待任务落库 {DEFAULT_INITIAL_POLL_DELAY_SECONDS} 秒后开始轮询"
+            )
             time.sleep(DEFAULT_INITIAL_POLL_DELAY_SECONDS)
-        progress_callback("状态轮询中")
+        progress_callback("开始轮询")
 
         status_data, video_url = _poll_task_status(
             api_key=api_key,
@@ -850,7 +901,7 @@ def _run_seedance_orchestration(context):
         )
     except Exception as exc:
         wrapped_error = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
-        progress_callback("失败")
+        progress_callback("??")
         _log_event("workflow.failed", task_id=task_id, error=str(wrapped_error))
         _update_task_log(task_log_id, status="failed", video_url=video_url, error=str(wrapped_error))
         return _build_orchestration_result(
@@ -862,12 +913,10 @@ def _run_seedance_orchestration(context):
             meta={},
         )
 
-
 def _map_orchestration_to_plugin_output(result):
     if result.get("status") == "completed" and result.get("output_path"):
         return [result["output_path"]]
     raise PluginFatalError(result.get("error") or "工作流执行失败")
-
 
 def run_seedance_workflow(context):
     return _map_orchestration_to_plugin_output(_run_seedance_orchestration(context))
@@ -896,12 +945,11 @@ def run_seedance_client(
 
 def get_info():
     return {
-        "name": "Shuzai Seedance 视频生成",
-        "description": "对接数载 Seedance 2.0 视频任务接口",
+        "name": "Shuzai Seedance 视频生成插件",
+        "description": "Shuzai Seedance 2.0 视频生成插件",
         "version": _PLUGIN_VERSION,
         "author": "Z Code",
     }
-
 
 def get_params():
     raw_params = load_plugin_config(_PLUGIN_FILE) or {}
@@ -943,7 +991,7 @@ def handle_action(action, data=None):
     if action == "download_videos":
         task_ids = payload.get("task_ids") or []
         if not task_ids:
-            return {"ok": False, "error": "未选择任务"}
+            return {"ok": False, "error": "请选择任务"}
         rows = []
         conn = _db_conn()
         try:
@@ -955,12 +1003,7 @@ def handle_action(action, data=None):
             conn.close()
         results = [_manual_download_video(row) for row in rows]
         return {"ok": True, "results": results}
-    return {"ok": False, "error": f"未知动作: {action}"}
-
-
-_init_task_log_db()
-_append_file_log("INFO", f"module.loaded version={_PLUGIN_VERSION}")
-
+    return {"ok": False, "error": f"不支持的操作: {action}"}
 
 if __name__ == "__main__":
     required_funcs = [
@@ -981,3 +1024,4 @@ if __name__ == "__main__":
     if missing:
         raise SystemExit(f"smoke check failed, missing callables: {missing}")
     print("smoke check passed")
+
