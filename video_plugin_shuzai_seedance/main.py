@@ -44,6 +44,8 @@ _RUNTIME_LOG_FILE_PATH = (
 _log_buffer = collections.deque(maxlen=2000)
 _log_index = 0
 _log_lock = threading.Lock()
+_db_init_lock = threading.Lock()
+_db_initialized = False
 
 _DEFAULT_BASE_URL = "https://openai.shuzaiaigc.com"
 _TASK_CREATE_PATH = "/v1/video/generations"
@@ -154,37 +156,60 @@ def get_buffered_logs(since_index=0):
         return [entry for entry in list(_log_buffer) if entry.get("index", 0) > since]
 
 
+def _create_task_log_table(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS video_task_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          created_at TEXT,
+          updated_at TEXT,
+          api_task_id TEXT,
+          model_name TEXT,
+          model_display TEXT,
+          prompt TEXT,
+          aspect_ratio TEXT,
+          duration TEXT,
+          generation_mode TEXT,
+          status TEXT,
+          error TEXT,
+          video_url TEXT,
+          local_path TEXT,
+          metadata TEXT
+        )
+        """
+    )
+
+
+def _ensure_task_log_db():
+    global _db_initialized
+    if _db_initialized:
+        return
+    with _db_init_lock:
+        if _db_initialized:
+            return
+        conn = sqlite3.connect(str(_TASK_LOG_DB_PATH))
+        try:
+            _create_task_log_table(conn)
+            conn.commit()
+            _db_initialized = True
+        finally:
+            conn.close()
+
+
 def _db_conn():
+    _ensure_task_log_db()
     conn = sqlite3.connect(str(_TASK_LOG_DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def _init_task_log_db():
-    conn = _db_conn()
+    conn = sqlite3.connect(str(_TASK_LOG_DB_PATH))
     try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS video_task_logs (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              created_at TEXT,
-              updated_at TEXT,
-              api_task_id TEXT,
-              model_name TEXT,
-              model_display TEXT,
-              prompt TEXT,
-              aspect_ratio TEXT,
-              duration TEXT,
-              generation_mode TEXT,
-              status TEXT,
-              error TEXT,
-              video_url TEXT,
-              local_path TEXT,
-              metadata TEXT
-            )
-            """
-        )
+        _create_task_log_table(conn)
         conn.commit()
+        global _db_initialized
+        _db_initialized = True
     finally:
         conn.close()
 
@@ -918,7 +943,7 @@ def _run_seedance_orchestration(context):
         _log_event("workflow.success", task_id=task_id, output_path=downloaded_path)
         return _build_orchestration_result(
             task_id=task_id,
-            status=status_data.get("status"),
+            status="completed",
             output_path=downloaded_path,
             video_url=video_url,
             error=None,

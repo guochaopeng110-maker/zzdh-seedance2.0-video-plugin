@@ -1,0 +1,11 @@
+{
+  "model": "doubao-seedance-2-0-260128",
+  "prompt": "test",
+  "seconds": "5",
+  "metadata": {
+    "resolution": "720p",
+    "ratio": "16:9",
+    "watermark": false,
+    "generate_audio": true
+  }
+}
