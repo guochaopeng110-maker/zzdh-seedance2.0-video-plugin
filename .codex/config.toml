@@ -78,6 +78,12 @@ config_file = "F:/Projects/zz-video-plugins/.codex/agents/gsd-verifier.toml"
 
 
 # GSD Hooks
-[[hooks]]
-event = "SessionStart"
-command = "node F:/Projects/zz-video-plugins/.codex/get-shit-done/hooks/gsd-update-check.js"
+#[[hooks]]
+#event = "SessionStart"
+#command = "node F:/Projects/zz-video-plugins/.codex/get-shit-done/hooks/gsd-update-check.js"
+#command = ["node", "F:/Projects/zz-video-plugins/.codex/get-shit-done/hooks/gsd-update-check.js"]
+
+# GSD Hooks
+[[hooks.SessionStart]]
+[[hooks.SessionStart.handlers]]
+command = ["node", "F:/Projects/zz-video-plugins/.codex/get-shit-done/hooks/gsd-update-check.js"]

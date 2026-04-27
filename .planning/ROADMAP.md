@@ -141,7 +141,17 @@ Plans:
 - [x] 08-01: ZLHub requires2 API 迁移与 V2 插件落地
 
 ---
-*最后更新：2026-04-23*
+*最后更新：2026-04-27*
+
+### Phase 08.3: 数载 Seedance 插件落地（不接 content 下载端点） (INSERTED)
+
+**Goal:** 基于 `video_plugin_zlhub_seedance` 交付新目录 `video_plugin_shuzai_seedance`，适配数载任务接口并严格禁用 `GET /v1/videos/{task_id}/content`。
+**Requirements**: CONT-03, API-02, API-03, API-04, ERR-01
+**Depends on:** Phase 8
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 08.3-01: Shuzai task API migration without content endpoint
 
 ### Phase 08.2: 固定参数策略与安全治理（URL/TOS/AKSK来源） (INSERTED)
 

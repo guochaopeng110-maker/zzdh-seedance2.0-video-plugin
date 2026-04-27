@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Shuzai Seedance 视频生成插件 v1.0.0</title>
+        <link rel="stylesheet" href="../../../plugin-sdk.css" />
+        <style>
+            .api-key-wrapper {
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
+
+            .api-key-wrapper input {
+                flex: 1;
+                padding-right: 36px;
+            }
+
+            .toggle-eye {
+                position: absolute;
+                right: 8px;
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 14px;
+                padding: 2px 4px;
+                line-height: 1;
+            }
+
+            .toggle-eye:hover {
+                color: var(--text-primary);
+            }
+
+            .hint-text {
+                font-size: 11px;
+                color: var(--text-muted);
+                margin-top: 8px;
+                line-height: 1.5;
+            }
+
+            .form-row {
+                margin-bottom: 12px;
+            }
+
+            .action-buttons {
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+            }
+
+            .action-buttons button {
+                flex: 1;
+                padding: 7px 0;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <h3>Shuzai Seedance 视频生成插件 v1.0.0</h3>
+        <p class="hint-text">对接数载 Seedance 2.0 视频任务接口，不包含图片审核链路。</p>
+        <hr />
+
+        <div class="form-row">
+            <label class="form-label">API Key</label>
+            <div class="form-control">
+                <div class="api-key-wrapper">
+                    <input type="password" id="apiKeyInput" placeholder="sk-..." />
+                    <button class="toggle-eye" id="toggleEye" type="button">&#128065;</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">Base URL</label>
+            <div class="form-control">
+                <input
+                    type="text"
+                    id="baseUrlInput"
+                    value="https://openai.shuzaiaigc.com"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">Model</label>
+            <div class="form-control">
+                <select id="modelSelect"></select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">分辨率</label>
+            <div class="form-control">
+                <select id="resolutionSelect">
+                    <option value="720p" selected>720p</option>
+                    <option value="480p">480p</option>
+                    <option value="1080p">1080p</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">宽高比</label>
+            <div class="form-control">
+                <select id="ratioSelect">
+                    <option value="16:9" selected>16:9</option>
+                    <option value="9:16">9:16</option>
+                    <option value="4:3">4:3</option>
+                    <option value="3:4">3:4</option>
+                    <option value="1:1">1:1</option>
+                    <option value="21:9">21:9</option>
+                    <option value="adaptive">adaptive</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">时长 (秒)</label>
+            <div class="form-control">
+                <select id="durationSelect">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5" selected>5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">生成音频</label>
+            <div class="form-control">
+                <select id="generateAudioSelect">
+                    <option value="true" selected>开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">添加水印</label>
+            <div class="form-control">
+                <select id="watermarkSelect">
+                    <option value="false" selected>关闭</option>
+                    <option value="true">开启</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">联网搜索</label>
+            <div class="form-control">
+                <select id="webSearchSelect">
+                    <option value="false" selected>关闭</option>
+                    <option value="true">开启</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">超时时间(秒)</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="timeoutInput"
+                    min="60"
+                    max="3600"
+                    step="1"
+                    value="900"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">最大轮询次数</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="maxPollAttemptsInput"
+                    min="1"
+                    max="2000"
+                    step="1"
+                    value="300"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">轮询间隔(秒)</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="pollIntervalInput"
+                    min="1"
+                    max="300"
+                    step="1"
+                    value="15"
+                />
+            </div>
+        </div>
+
+        <div class="hint-text">
+            <strong>接口约束</strong><br />
+            - 任务创建: <code>POST /v1/video/generations</code><br />
+            - 状态查询: <code>GET /v1/video/generations/{task_id}</code><br />
+            - 本插件不会调用 <code>GET /v1/videos/{task_id}/content</code>
+        </div>
+
+        <div class="action-buttons">
+            <button id="btnTaskLog" type="button">任务日志 / 手动下载</button>
+            <button id="btnLiveLog" type="button">实时日志</button>
+        </div>
+
+        <script src="../../../plugin-sdk.js"></script>
+        <script>
+            var apiKeyInput = document.getElementById("apiKeyInput");
+            var toggleEye = document.getElementById("toggleEye");
+            var baseUrlInput = document.getElementById("baseUrlInput");
+            var modelSelect = document.getElementById("modelSelect");
+            var resolutionSelect = document.getElementById("resolutionSelect");
+            var ratioSelect = document.getElementById("ratioSelect");
+            var durationSelect = document.getElementById("durationSelect");
+            var generateAudioSelect = document.getElementById("generateAudioSelect");
+            var watermarkSelect = document.getElementById("watermarkSelect");
+            var webSearchSelect = document.getElementById("webSearchSelect");
+            var timeoutInput = document.getElementById("timeoutInput");
+            var maxPollAttemptsInput = document.getElementById("maxPollAttemptsInput");
+            var pollIntervalInput = document.getElementById("pollIntervalInput");
+            var btnTaskLog = document.getElementById("btnTaskLog");
+            var btnLiveLog = document.getElementById("btnLiveLog");
+            var STANDARD_MODELS = ["doubao-seedance-2-0-260128", "seedance2.0-v", "seedance2.0-t"];
+            var HD_MODELS = ["seedance2.0-1080-v", "seedance2.0-1080-t"];
+
+            function getModelsForResolution(resolution) {
+                return String(resolution || "").toLowerCase() === "1080p"
+                    ? HD_MODELS.slice()
+                    : STANDARD_MODELS.slice();
+            }
+
+            function refreshModelOptions(preferredModel) {
+                var models = getModelsForResolution(resolutionSelect.value);
+                var candidate = preferredModel || modelSelect.value || "";
+                modelSelect.innerHTML = "";
+                models.forEach(function (model) {
+                    var option = document.createElement("option");
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+                if (models.indexOf(candidate) >= 0) {
+                    modelSelect.value = candidate;
+                } else {
+                    modelSelect.value = models[0];
+                }
+                return modelSelect.value;
+            }
+
+            toggleEye.addEventListener("click", function () {
+                if (apiKeyInput.type === "password") {
+                    apiKeyInput.type = "text";
+                    toggleEye.textContent = "\uD83D\uDE48";
+                } else {
+                    apiKeyInput.type = "password";
+                    toggleEye.textContent = "\uD83D\uDC41";
+                }
+            });
+
+            apiKeyInput.addEventListener("change", function () {
+                PluginSDK.saveParam("api_key", apiKeyInput.value);
+            });
+            baseUrlInput.addEventListener("change", function () {
+                PluginSDK.saveParam("base_url", (baseUrlInput.value || "").trim());
+            });
+            modelSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("model", modelSelect.value);
+            });
+            resolutionSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("resolution", resolutionSelect.value);
+                PluginSDK.saveParam("model", refreshModelOptions());
+            });
+            ratioSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("ratio", ratioSelect.value);
+            });
+            durationSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("duration", parseInt(durationSelect.value, 10) || 5);
+            });
+            generateAudioSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("generate_audio", generateAudioSelect.value === "true");
+            });
+            watermarkSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("watermark", watermarkSelect.value === "true");
+            });
+            webSearchSelect.addEventListener("change", function () {
+                PluginSDK.saveParam("web_search", webSearchSelect.value === "true");
+            });
+            timeoutInput.addEventListener("change", function () {
+                PluginSDK.saveParam("timeout", parseInt(timeoutInput.value, 10) || 900);
+            });
+            maxPollAttemptsInput.addEventListener("change", function () {
+                PluginSDK.saveParam(
+                    "max_poll_attempts",
+                    parseInt(maxPollAttemptsInput.value, 10) || 300,
+                );
+            });
+            pollIntervalInput.addEventListener("change", function () {
+                PluginSDK.saveParam("poll_interval", parseInt(pollIntervalInput.value, 10) || 15);
+            });
+
+            btnTaskLog.addEventListener("click", function () {
+                PluginSDK.sendAction("open_task_logs");
+            });
+            btnLiveLog.addEventListener("click", function () {
+                PluginSDK.sendAction("open_live_logs");
+            });
+
+            PluginSDK.onReady(function (params) {
+                if (params.api_key) apiKeyInput.value = params.api_key;
+                if (params.base_url) baseUrlInput.value = params.base_url;
+                if (params.resolution) resolutionSelect.value = params.resolution;
+                var normalizedModel = refreshModelOptions(params.model);
+                if (params.model !== normalizedModel) {
+                    PluginSDK.saveParam("model", normalizedModel);
+                }
+                if (params.ratio) ratioSelect.value = params.ratio;
+                if (params.duration != null) durationSelect.value = String(params.duration);
+                if (params.generate_audio != null)
+                    generateAudioSelect.value = String(params.generate_audio);
+                if (params.watermark != null) watermarkSelect.value = String(params.watermark);
+                if (params.web_search != null) webSearchSelect.value = String(params.web_search);
+                if (params.timeout) timeoutInput.value = params.timeout;
+                if (params.max_poll_attempts) maxPollAttemptsInput.value = params.max_poll_attempts;
+                if (params.poll_interval) pollIntervalInput.value = params.poll_interval;
+            });
+
+            refreshModelOptions();
+        </script>
+    </body>
+</html>
