@@ -1,11 +1,5 @@
 # TOS临时公开云存储对接
 
-公开云提供的AK和SK如下:
-
-AK:AKLTNzI3MDM1NDQwZGMyNDM2M2E5YzY3MGE1ZGVjNzgyMzY
-
-SK:TmpFNFpUUmxaRE16TmpobE5EWTRaVGxrTXpabVpXRTJObVpsTVRjek1HWQ==
-
 ## **1. 基础信息**
 
 本接口基于火山引擎 TOS 实现素材上传功能，返回的资源 **URL 有效期为 7 天**。
