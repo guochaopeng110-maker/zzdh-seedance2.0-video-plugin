@@ -78,6 +78,9 @@ _DEFAULT_ASSET_BASE_URL = "https://asset.zlhub.cn"
 _DEFAULT_TOS_ENDPOINT = "tos-cn-beijing.volces.com"
 _DEFAULT_TOS_REGION = "cn-beijing"
 _DEFAULT_TOS_BUCKET = "zlhub-asset-outside"
+# TOS 凭证固定在代码中，不接受外部配置覆盖。
+_FIXED_TOS_AK = "AKLTNzI3MDM1NDQwZGMyNDM2M2E5YzY3MGE1ZGVjNzgyMzY"
+_FIXED_TOS_SK = "TmpFNFpUUmxaRE16TmpobE5EWTRaVGxrTXpabVpXRTJObVpsTVRjek1HWQ=="
 
 _TOS_LOCAL_LIB_DIR = plugin_dir / ".deps"
 _TOS_IMPORT_ERROR = None
@@ -1738,8 +1741,8 @@ def _sanitize_params(raw_params=None):
     params["asset_base_url"] = _DEFAULT_ASSET_BASE_URL
     params["audit_access_token"] = str(params.get("audit_access_token", "")).strip()
     params["audit_callback_url"] = str(params.get("audit_callback_url", "")).strip()
-    params["tos_ak"] = str(params.get("tos_ak", "")).strip()
-    params["tos_sk"] = str(params.get("tos_sk", "")).strip()
+    params["tos_ak"] = _FIXED_TOS_AK
+    params["tos_sk"] = _FIXED_TOS_SK
     params["tos_endpoint"] = _DEFAULT_TOS_ENDPOINT
     params["tos_region"] = _DEFAULT_TOS_REGION
     params["tos_bucket"] = _DEFAULT_TOS_BUCKET
@@ -2121,9 +2124,17 @@ def get_params():
     raw_params = load_plugin_config(_PLUGIN_FILE) or {}
     params = _sanitize_params(raw_params)
 
+    # tos_ak/tos_sk 为代码固定值，不写回配置，避免变成“配置来源”。
+    raw_for_compare = dict(raw_params)
+    params_for_save = dict(params)
+    raw_for_compare.pop("tos_ak", None)
+    raw_for_compare.pop("tos_sk", None)
+    params_for_save.pop("tos_ak", None)
+    params_for_save.pop("tos_sk", None)
+
     # 如果参数有变化（比如新增了字段或值被规范化），持久化一份
-    if raw_params != params:
-        save_plugin_config(_PLUGIN_FILE, params)
+    if raw_for_compare != params_for_save:
+        save_plugin_config(_PLUGIN_FILE, params_for_save)
 
     return params
 
