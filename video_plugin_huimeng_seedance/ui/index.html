@@ -1,172 +1,441 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Huimeng Seedance 配置</title>
-  <style>
-    body { font-family: "Microsoft YaHei", sans-serif; margin: 16px; color: #222; }
-    .row { margin-bottom: 12px; }
-    label { display: block; font-weight: 600; margin-bottom: 4px; }
-    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
-    .hint { font-size: 12px; color: #666; margin-top: 3px; }
-    .warn { background: #fff8e8; border: 1px solid #f2d48a; padding: 8px; border-radius: 6px; font-size: 12px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  </style>
-</head>
-<body>
-  <div class="warn">
-    模型参数可选值严格参考《视频模型的params参数说明.md》。<br>
-    注意：`happyhorse-1.0` 不支持 `human_review`、`reference_videos`、`reference_audios`。
-  </div>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Huimeng Seedance 视频生成插件</title>
+        <link rel="stylesheet" href="../../../plugin-sdk.css" />
+        <style>
+            .api-key-wrapper {
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
 
-  <div class="row">
-    <label for="api_key">API Key</label>
-    <input id="api_key" type="password" placeholder="hm-xxxxxxxx" />
-  </div>
+            .api-key-wrapper input {
+                flex: 1;
+                padding-right: 36px;
+            }
 
-  <div class="row">
-    <label for="model">模型 ID</label>
-    <select id="model"></select>
-  </div>
+            .toggle-eye {
+                position: absolute;
+                right: 8px;
+                background: none;
+                border: none;
+                color: var(--text-muted);
+                cursor: pointer;
+                font-size: 14px;
+                padding: 2px 4px;
+                line-height: 1;
+            }
 
-  <div class="grid">
-    <div class="row">
-      <label for="ratio">ratio</label>
-      <select id="ratio"></select>
-    </div>
+            .toggle-eye:hover {
+                color: var(--text-primary);
+            }
 
-    <div class="row">
-      <label for="resolution">resolution</label>
-      <select id="resolution"></select>
-    </div>
-  </div>
+            .hint-text {
+                font-size: 11px;
+                color: var(--text-muted);
+                margin-top: 8px;
+                line-height: 1.5;
+            }
 
-  <div class="grid">
-    <div class="row">
-      <label for="duration">duration (秒)</label>
-      <input id="duration" type="number" min="3" max="15" />
-    </div>
+            .form-row {
+                margin-bottom: 12px;
+            }
 
-    <div class="row">
-      <label for="tasks_endpoint">tasks endpoint</label>
-      <input id="tasks_endpoint" type="text" value="https://api.huimengi.com/api/v1/tasks" />
-    </div>
-  </div>
+            .action-buttons {
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+            }
 
-  <div class="row">
-    <label><input id="generate_audio" type="checkbox" /> generate_audio</label>
-    <div class="hint">仅 seedance 系列模型有效</div>
-  </div>
+            .action-buttons button {
+                flex: 1;
+                padding: 7px 0;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <h3>Huimeng Seedance 视频生成插件</h3>
+        <p class="hint-text">对接 Huimeng 平台，支持多模型视频生成。</p>
+        <hr />
 
-  <div class="row">
-    <label><input id="human_review" type="checkbox" /> human_review</label>
-    <div class="hint">仅 seedance 系列模型有效，happyhorse 不支持</div>
-  </div>
+        <div class="form-row">
+            <label class="form-label">API Key</label>
+            <div class="form-control">
+                <div class="api-key-wrapper">
+                    <input
+                        type="password"
+                        id="apiKeyInput"
+                        placeholder="hm-xxxxxxxx"
+                    />
+                    <button class="toggle-eye" id="toggleEye" type="button">
+                        &#128065;
+                    </button>
+                </div>
+            </div>
+        </div>
 
-  <script>
-    const MODEL_MAP = {
-      "happyhorse-1.0": {
-        ratio: ["16:9", "9:16", "1:1", "4:3", "3:4"],
-        resolution: ["1080P", "720P"],
-        duration: { min: 3, max: 15 },
-        supports: { generate_audio: false, human_review: false }
-      },
-      "seedance-2.0-value": {
-        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
-        resolution: ["720p", "1080p"],
-        duration: { min: 4, max: 15 },
-        supports: { generate_audio: true, human_review: true }
-      },
-      "seedance-2.0-fast-value": {
-        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
-        resolution: ["720p", "1080p"],
-        duration: { min: 4, max: 15 },
-        supports: { generate_audio: true, human_review: true }
-      },
-      "seedance-2.0": {
-        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
-        resolution: ["480p", "720p", "1080p"],
-        duration: { min: 4, max: 15 },
-        supports: { generate_audio: true, human_review: true }
-      },
-      "seedance-2.0-fast": {
-        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
-        resolution: ["480p", "720p"],
-        duration: { min: 4, max: 15 },
-        supports: { generate_audio: true, human_review: true }
-      }
-    };
+        <div class="form-row">
+            <label class="form-label">任务接口地址</label>
+            <div class="form-control">
+                <input
+                    type="text"
+                    id="tasksEndpointInput"
+                    value="https://api.huimengi.com/api/v1/tasks"
+                />
+            </div>
+        </div>
 
-    const modelEl = document.getElementById("model");
-    const ratioEl = document.getElementById("ratio");
-    const resolutionEl = document.getElementById("resolution");
-    const durationEl = document.getElementById("duration");
-    const generateAudioEl = document.getElementById("generate_audio");
-    const humanReviewEl = document.getElementById("human_review");
+        <div class="form-row">
+            <label class="form-label">模型 ID</label>
+            <div class="form-control">
+                <select id="modelSelect"></select>
+            </div>
+        </div>
 
-    function refillSelect(el, values) {
-      el.innerHTML = "";
-      values.forEach((v) => {
-        const opt = document.createElement("option");
-        opt.value = v;
-        opt.textContent = v;
-        el.appendChild(opt);
-      });
-    }
+        <div class="form-row">
+            <label class="form-label">宽高比 (ratio)</label>
+            <div class="form-control">
+                <select id="ratioSelect"></select>
+            </div>
+        </div>
 
-    function syncByModel() {
-      const m = modelEl.value;
-      const cfg = MODEL_MAP[m];
-      refillSelect(ratioEl, cfg.ratio);
-      refillSelect(resolutionEl, cfg.resolution);
-      durationEl.min = cfg.duration.min;
-      durationEl.max = cfg.duration.max;
-      if (!durationEl.value) durationEl.value = cfg.duration.min;
+        <div class="form-row">
+            <label class="form-label">分辨率 (resolution)</label>
+            <div class="form-control">
+                <select id="resolutionSelect"></select>
+            </div>
+        </div>
 
-      generateAudioEl.disabled = !cfg.supports.generate_audio;
-      if (generateAudioEl.disabled) generateAudioEl.checked = false;
+        <div class="form-row">
+            <label class="form-label">视频时长 (duration)</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="durationInput"
+                    min="3"
+                    max="15"
+                    step="1"
+                    value="5"
+                />
+            </div>
+        </div>
 
-      humanReviewEl.disabled = !cfg.supports.human_review;
-      if (humanReviewEl.disabled) humanReviewEl.checked = false;
-    }
+        <div class="form-row" id="generateAudioRow">
+            <label class="form-label">生成音频 (generate_audio)</label>
+            <div class="form-control">
+                <select id="generateAudioSelect">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                </select>
+            </div>
+        </div>
 
-    Object.keys(MODEL_MAP).forEach((id) => {
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = id;
-      modelEl.appendChild(opt);
-    });
-    modelEl.value = "seedance-2.0";
-    syncByModel();
-    modelEl.addEventListener("change", syncByModel);
+        <div class="form-row" id="humanReviewRow">
+            <label class="form-label">真人审核 (human_review)</label>
+            <div class="form-control">
+                <select id="humanReviewSelect">
+                    <option value="false">关闭</option>
+                    <option value="true">开启</option>
+                </select>
+            </div>
+        </div>
 
-    window.get_params = function () {
-      return {
-        api_key: document.getElementById("api_key").value,
-        model: modelEl.value,
-        ratio: ratioEl.value,
-        resolution: resolutionEl.value,
-        duration: Number(durationEl.value || 5),
-        tasks_endpoint: document.getElementById("tasks_endpoint").value,
-        generate_audio: !!generateAudioEl.checked,
-        human_review: !!humanReviewEl.checked
-      };
-    };
+        <div class="form-row">
+            <label class="form-label">超时时间(秒)</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="timeoutInput"
+                    min="30"
+                    max="3600"
+                    step="1"
+                    value="900"
+                />
+            </div>
+        </div>
 
-    window.set_params = function (params) {
-      if (!params) return;
-      document.getElementById("api_key").value = params.api_key || "";
-      if (params.model && MODEL_MAP[params.model]) modelEl.value = params.model;
-      syncByModel();
-      if (params.ratio) ratioEl.value = params.ratio;
-      if (params.resolution) resolutionEl.value = params.resolution;
-      if (params.duration != null) durationEl.value = String(params.duration);
-      document.getElementById("tasks_endpoint").value = params.tasks_endpoint || "https://api.huimengi.com/api/v1/tasks";
-      generateAudioEl.checked = !!params.generate_audio;
-      humanReviewEl.checked = !!params.human_review;
-      syncByModel();
-    };
-  </script>
-</body>
+        <div class="form-row">
+            <label class="form-label">最大轮询次数</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="maxPollAttemptsInput"
+                    min="1"
+                    max="2000"
+                    step="1"
+                    value="180"
+                />
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">轮询间隔(秒)</label>
+            <div class="form-control">
+                <input
+                    type="number"
+                    id="pollIntervalInput"
+                    min="1"
+                    max="300"
+                    step="1"
+                    value="180"
+                />
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button id="btnTaskLog" type="button">任务日志 / 手动拉取</button>
+            <button id="btnLiveLog" type="button">实时日志</button>
+        </div>
+
+        <script src="../../../plugin-sdk.js"></script>
+        <script>
+            var MODEL_MAP = {
+                "happyhorse-1.0": {
+                    ratio: ["16:9", "9:16", "1:1", "4:3", "3:4"],
+                    resolution: ["1080P", "720P"],
+                    duration: { min: 3, max: 15 },
+                    supports: { generate_audio: false, human_review: false },
+                },
+                "seedance-2.0-value": {
+                    ratio: [
+                        "16:9",
+                        "4:3",
+                        "1:1",
+                        "3:4",
+                        "9:16",
+                        "21:9",
+                        "adaptive",
+                    ],
+                    resolution: ["720p", "1080p"],
+                    duration: { min: 4, max: 15 },
+                    supports: { generate_audio: true, human_review: true },
+                },
+                "seedance-2.0-fast-value": {
+                    ratio: [
+                        "16:9",
+                        "4:3",
+                        "1:1",
+                        "3:4",
+                        "9:16",
+                        "21:9",
+                        "adaptive",
+                    ],
+                    resolution: ["720p", "1080p"],
+                    duration: { min: 4, max: 15 },
+                    supports: { generate_audio: true, human_review: true },
+                },
+                "seedance-2.0": {
+                    ratio: [
+                        "16:9",
+                        "4:3",
+                        "1:1",
+                        "3:4",
+                        "9:16",
+                        "21:9",
+                        "adaptive",
+                    ],
+                    resolution: ["480p", "720p", "1080p"],
+                    duration: { min: 4, max: 15 },
+                    supports: { generate_audio: true, human_review: true },
+                },
+                "seedance-2.0-fast": {
+                    ratio: [
+                        "16:9",
+                        "4:3",
+                        "1:1",
+                        "3:4",
+                        "9:16",
+                        "21:9",
+                        "adaptive",
+                    ],
+                    resolution: ["480p", "720p"],
+                    duration: { min: 4, max: 15 },
+                    supports: { generate_audio: true, human_review: true },
+                },
+            };
+
+            var apiKeyInput = document.getElementById("apiKeyInput");
+            var toggleEye = document.getElementById("toggleEye");
+            var tasksEndpointInput =
+                document.getElementById("tasksEndpointInput");
+            var modelSelect = document.getElementById("modelSelect");
+            var ratioSelect = document.getElementById("ratioSelect");
+            var resolutionSelect = document.getElementById("resolutionSelect");
+            var durationInput = document.getElementById("durationInput");
+            var generateAudioSelect =
+                document.getElementById("generateAudioSelect");
+            var humanReviewSelect =
+                document.getElementById("humanReviewSelect");
+            var generateAudioRow = document.getElementById("generateAudioRow");
+            var humanReviewRow = document.getElementById("humanReviewRow");
+            var timeoutInput = document.getElementById("timeoutInput");
+            var maxPollAttemptsInput = document.getElementById(
+                "maxPollAttemptsInput",
+            );
+            var pollIntervalInput =
+                document.getElementById("pollIntervalInput");
+            var btnTaskLog = document.getElementById("btnTaskLog");
+            var btnLiveLog = document.getElementById("btnLiveLog");
+
+            function refillSelect(el, values) {
+                el.innerHTML = "";
+                values.forEach(function (v) {
+                    var opt = document.createElement("option");
+                    opt.value = v;
+                    opt.textContent = v;
+                    el.appendChild(opt);
+                });
+            }
+
+            function syncByModel() {
+                var model = modelSelect.value;
+                var cfg = MODEL_MAP[model];
+                if (!cfg) return;
+
+                refillSelect(ratioSelect, cfg.ratio);
+                refillSelect(resolutionSelect, cfg.resolution);
+
+                durationInput.min = String(cfg.duration.min);
+                durationInput.max = String(cfg.duration.max);
+                var d = parseInt(durationInput.value, 10);
+                if (isNaN(d) || d < cfg.duration.min) {
+                    durationInput.value = String(cfg.duration.min);
+                } else if (d > cfg.duration.max) {
+                    durationInput.value = String(cfg.duration.max);
+                }
+
+                if (!cfg.supports.generate_audio) {
+                    generateAudioSelect.value = "false";
+                    generateAudioSelect.disabled = true;
+                    generateAudioRow.style.display = "none";
+                } else {
+                    generateAudioSelect.disabled = false;
+                    generateAudioRow.style.display = "";
+                }
+
+                if (!cfg.supports.human_review) {
+                    humanReviewSelect.value = "false";
+                    humanReviewSelect.disabled = true;
+                    humanReviewRow.style.display = "none";
+                } else {
+                    humanReviewSelect.disabled = false;
+                    humanReviewRow.style.display = "";
+                }
+            }
+
+            function saveAll() {
+                PluginSDK.saveParam("api_key", apiKeyInput.value || "");
+                PluginSDK.saveParam(
+                    "tasks_endpoint",
+                    tasksEndpointInput.value || "",
+                );
+                PluginSDK.saveParam("model", modelSelect.value);
+                PluginSDK.saveParam("ratio", ratioSelect.value);
+                PluginSDK.saveParam("resolution", resolutionSelect.value);
+                PluginSDK.saveParam(
+                    "duration",
+                    parseInt(durationInput.value, 10) || 5,
+                );
+                PluginSDK.saveParam(
+                    "generate_audio",
+                    generateAudioSelect.value === "true",
+                );
+                PluginSDK.saveParam(
+                    "human_review",
+                    humanReviewSelect.value === "true",
+                );
+                PluginSDK.saveParam(
+                    "timeout",
+                    parseInt(timeoutInput.value, 10) || 900,
+                );
+                PluginSDK.saveParam(
+                    "max_poll_attempts",
+                    parseInt(maxPollAttemptsInput.value, 10) || 180,
+                );
+                PluginSDK.saveParam(
+                    "poll_interval",
+                    parseInt(pollIntervalInput.value, 10) || 180,
+                );
+            }
+
+            toggleEye.addEventListener("click", function () {
+                if (apiKeyInput.type === "password") {
+                    apiKeyInput.type = "text";
+                    toggleEye.textContent = "\uD83D\uDE48";
+                } else {
+                    apiKeyInput.type = "password";
+                    toggleEye.textContent = "\uD83D\uDC41";
+                }
+            });
+
+            Object.keys(MODEL_MAP).forEach(function (id) {
+                var opt = document.createElement("option");
+                opt.value = id;
+                opt.textContent = id;
+                modelSelect.appendChild(opt);
+            });
+
+            [
+                apiKeyInput,
+                tasksEndpointInput,
+                modelSelect,
+                ratioSelect,
+                resolutionSelect,
+                durationInput,
+                generateAudioSelect,
+                humanReviewSelect,
+                timeoutInput,
+                maxPollAttemptsInput,
+                pollIntervalInput,
+            ].forEach(function (el) {
+                el.addEventListener("change", saveAll);
+            });
+
+            modelSelect.addEventListener("change", function () {
+                syncByModel();
+                saveAll();
+            });
+
+            btnTaskLog.addEventListener("click", function () {
+                PluginSDK.sendAction("open_task_logs");
+            });
+
+            btnLiveLog.addEventListener("click", function () {
+                PluginSDK.sendAction("open_live_logs");
+            });
+
+            PluginSDK.onReady(function (params) {
+                if (params.api_key) apiKeyInput.value = params.api_key;
+                if (params.tasks_endpoint)
+                    tasksEndpointInput.value = params.tasks_endpoint;
+                if (params.model && MODEL_MAP[params.model]) {
+                    modelSelect.value = params.model;
+                } else {
+                    modelSelect.value = "seedance-2.0";
+                }
+
+                syncByModel();
+
+                if (params.ratio) ratioSelect.value = params.ratio;
+                if (params.resolution)
+                    resolutionSelect.value = params.resolution;
+                if (params.duration != null)
+                    durationInput.value = String(params.duration);
+                if (params.generate_audio != null)
+                    generateAudioSelect.value = String(params.generate_audio);
+                if (params.human_review != null)
+                    humanReviewSelect.value = String(params.human_review);
+                if (params.timeout) timeoutInput.value = params.timeout;
+                if (params.max_poll_attempts)
+                    maxPollAttemptsInput.value = params.max_poll_attempts;
+                if (params.poll_interval)
+                    pollIntervalInput.value = params.poll_interval;
+
+                syncByModel();
+            });
+        </script>
+    </body>
 </html>

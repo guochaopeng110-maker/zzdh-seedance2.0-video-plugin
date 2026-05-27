@@ -283,7 +283,8 @@ def _build_default_params():
         "human_review": False,
         "timeout": 900,
         "max_poll_attempts": 180,
-        "poll_interval": 5,
+        "poll_interval": 180,
+        "initial_poll_delay": 180,
     }
 
 
@@ -331,6 +332,71 @@ def _is_remote(value):
     return text.startswith(("http://", "https://", "data:", "asset://"))
 
 
+def _normalize_multi_value_input(value, field_name="unknown"):
+    if value is None:
+        _log_event(
+            "reference_input.normalized",
+            field=field_name,
+            raw_type="NoneType",
+            normalized_count=0,
+        )
+        return []
+    raw_type = type(value).__name__
+    if isinstance(value, list):
+        _log_event(
+            "reference_input.normalized",
+            field=field_name,
+            raw_type=raw_type,
+            normalized_count=len(value),
+        )
+        return value
+    if isinstance(value, tuple):
+        normalized = list(value)
+        _log_event(
+            "reference_input.normalized",
+            field=field_name,
+            raw_type=raw_type,
+            normalized_count=len(normalized),
+        )
+        return normalized
+    if isinstance(value, dict):
+        # 兼容宿主传入的 {0: "...", 1: "..."} 形态
+        items = []
+        for k, v in value.items():
+            try:
+                sort_key = int(k)
+            except Exception:
+                sort_key = str(k)
+            items.append((sort_key, v))
+        items.sort(key=lambda x: x[0])
+        normalized = [v for _, v in items]
+        _log_event(
+            "reference_input.normalized",
+            field=field_name,
+            raw_type=raw_type,
+            normalized_count=len(normalized),
+        )
+        return normalized
+
+    # 兼容可能的 JSON 字符串输入
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("[") or text.startswith("{"):
+            try:
+                parsed = json.loads(text)
+                return _normalize_multi_value_input(parsed, field_name=field_name)
+            except Exception:
+                pass
+    normalized = [value]
+    _log_event(
+        "reference_input.normalized",
+        field=field_name,
+        raw_type=raw_type,
+        normalized_count=len(normalized),
+    )
+    return normalized
+
+
 def _guess_mime_type(file_path):
     mime_type, _ = mimetypes.guess_type(file_path)
     return mime_type or "application/octet-stream"
@@ -356,12 +422,7 @@ def upload_image_to_host(image_path, timeout=60):
 
 
 def _normalize_reference_images(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        arr = value
-    else:
-        arr = [value]
+    arr = _normalize_multi_value_input(value, field_name="reference_images")
 
     normalized = []
     for item in arr:
@@ -381,12 +442,7 @@ def _normalize_reference_images(value):
 
 
 def _normalize_reference_list(value, field_name):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        arr = value
-    else:
-        arr = [value]
+    arr = _normalize_multi_value_input(value, field_name=field_name)
     out = []
     for item in arr:
         url = str(item or "").strip()
@@ -434,9 +490,15 @@ def _sanitize_params(raw_params=None):
     except Exception:
         params["max_poll_attempts"] = 180
     try:
-        params["poll_interval"] = max(1, int(params.get("poll_interval", 5)))
+        params["poll_interval"] = max(1, int(params.get("poll_interval", 180)))
     except Exception:
-        params["poll_interval"] = 5
+        params["poll_interval"] = 180
+    try:
+        params["initial_poll_delay"] = max(
+            0, int(params.get("initial_poll_delay", params["poll_interval"]))
+        )
+    except Exception:
+        params["initial_poll_delay"] = params["poll_interval"]
 
     params["tasks_endpoint"] = str(params.get("tasks_endpoint") or _HUIMENG_TASKS_ENDPOINT).strip()
     params["api_key"] = str(params.get("api_key") or "").strip()
@@ -487,7 +549,7 @@ def _build_payload(params, prompt, reference_images=None, reference_videos=None,
 
 
 def _create_task(api_key, tasks_endpoint, payload, timeout):
-    _log_event("create_task.request", endpoint=tasks_endpoint)
+    _log_event("create_task.request", endpoint=tasks_endpoint, payload=payload)
     resp = requests.post(
         tasks_endpoint,
         headers=_auth_headers(api_key, include_content_type=True),
@@ -495,11 +557,18 @@ def _create_task(api_key, tasks_endpoint, payload, timeout):
         timeout=timeout,
     )
     if resp.status_code not in {200, 201}:
+        _log_event(
+            "create_task.failed",
+            endpoint=tasks_endpoint,
+            http_status=resp.status_code,
+            response_text=(resp.text or "")[:1000],
+        )
         raise PluginFatalError(f"创建任务失败: HTTP {resp.status_code} - {resp.text}")
     data = resp.json() if resp.content else {}
     task_id = data.get("task_id") or data.get("id")
     if not task_id:
         raise PluginFatalError("创建任务失败: 响应缺少 task_id")
+    _log_event("create_task.success", endpoint=tasks_endpoint, task_id=str(task_id))
     return str(task_id), data
 
 
@@ -508,6 +577,14 @@ def _poll_task(api_key, tasks_endpoint, task_id, timeout, max_attempts, poll_int
     for attempt in range(1, max_attempts + 1):
         resp = requests.get(query_url, headers=_auth_headers(api_key, include_content_type=False), timeout=timeout)
         if resp.status_code != 200:
+            _log_event(
+                "poll_task.attempt",
+                task_id=task_id,
+                attempt=attempt,
+                max_attempts=max_attempts,
+                http_status=resp.status_code,
+                status="http_error",
+            )
             if progress_callback:
                 progress_callback(f"状态查询异常 HTTP {resp.status_code}，重试中")
             time.sleep(poll_interval)
@@ -515,15 +592,37 @@ def _poll_task(api_key, tasks_endpoint, task_id, timeout, max_attempts, poll_int
 
         data = resp.json() if resp.content else {}
         status = str(data.get("status") or "").strip().lower()
+        _log_event(
+            "poll_task.attempt",
+            task_id=task_id,
+            attempt=attempt,
+            max_attempts=max_attempts,
+            http_status=resp.status_code,
+            status=status or "unknown",
+        )
         if status == "completed":
             result = data.get("result") or {}
             video_url = result.get("video_url")
             if not video_url:
                 raise PluginFatalError("任务完成但未返回 video_url")
+            _log_event(
+                "poll_task.completed",
+                task_id=task_id,
+                status=status,
+                video_url=str(video_url),
+                response=data,
+            )
             return data, str(video_url)
 
         if status == "failed":
             error_message = data.get("error_message") or data.get("message") or "未知错误"
+            _log_event(
+                "poll_task.failed",
+                task_id=task_id,
+                status=status,
+                error_message=error_message,
+                response=data,
+            )
             raise PluginFatalError(f"任务失败: {error_message}")
 
         if progress_callback:
@@ -591,6 +690,10 @@ def _run_workflow(context):
         _update_task_log(task_log_id, api_task_id=task_id)
 
         progress_callback("状态轮询中")
+        initial_poll_delay = int(params.get("initial_poll_delay", params["poll_interval"]))
+        if initial_poll_delay > 0:
+            progress_callback(f"任务已提交，等待 {initial_poll_delay} 秒后开始首次查询")
+            time.sleep(initial_poll_delay)
         _, video_url = _poll_task(
             params["api_key"],
             params["tasks_endpoint"],
@@ -612,10 +715,22 @@ def _run_workflow(context):
             local_path=final_path,
             error=None,
         )
+        _log_event(
+            "workflow.success",
+            task_id=task_id,
+            video_url=video_url,
+            output_path=final_path,
+        )
         progress_callback("完成")
         return [final_path]
     except Exception as exc:
         wrapped = exc if isinstance(exc, PluginFatalError) else PluginFatalError(str(exc))
+        _log_event(
+            "workflow.failed",
+            task_id=task_id,
+            video_url=video_url,
+            error=str(wrapped),
+        )
         _update_task_log(task_log_id, status="failed", video_url=video_url, error=str(wrapped))
         progress_callback("失败")
         raise wrapped
