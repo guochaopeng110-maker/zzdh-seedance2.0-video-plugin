@@ -17,7 +17,7 @@
 | 重新设计插件契约 | 需要宿主配合改造，风险高 | |
 
 **User's choice:** 延续现有宿主契约与目录结构（基于“参考 zlhub seedance 机制”）
-**Notes:** 现有多个插件目录均已稳定运行，优先一致性。
+**Notes:** 现有多个插件目录均已稳定运行，优先一致性；新插件目录名固定为 `video_plugin_huimeng_seedance`。
 
 ---
 
@@ -37,11 +37,11 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| 兼容 Seedance 核心参数并增加 URL 上传转换 | 保持使用习惯一致，满足 Huimeng 仅公网 URL 的输入约束 | ✓ |
+| UI 显式支持 5 个模型 ID 并兼容核心参数与 URL 上传转换 | 保持模型选择明确、使用习惯一致，满足 Huimeng 仅公网 URL 的输入约束 | ✓ |
 | 仅暴露最小参数集 | 实现更快，但会降低与现有插件的一致性 | |
 
-**User's choice:** 兼容 Seedance 核心参数并增加 URL 上传转换
-**Notes:** 文档已给出图片上传公网 URL 示例，可直接纳入实现。
+**User's choice:** UI 显式支持 5 个模型 ID 并兼容核心参数与 URL 上传转换
+**Notes:** 需在界面上支持 `happyhorse-1.0`、`seedance-2.0-value`、`seedance-2.0-fast-value`、`seedance-2.0`、`seedance-2.0-fast` 五种模型 ID；其中 `happyhorse-1.0` 不传 `human_review`、`reference_videos`、`reference_audios`。不同模型下 `ratio`、`resolution` 等 params 可选值严格以 `docs/require4/视频模型的params参数说明.md` 为准。文档已给出图片上传公网 URL 示例，可直接纳入实现。
 
 ---
 

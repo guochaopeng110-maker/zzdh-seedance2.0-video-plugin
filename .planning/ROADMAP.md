@@ -140,6 +140,16 @@ Plans:
 Plans:
 - [x] 08-01: ZLHub requires2 API 迁移与 V2 插件落地
 
+### Phase 9: Huimeng 视频生成插件对接（参考 zlhub seedance 机制）
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 9 to break down)
+
 ---
 *最后更新：2026-04-27*
 

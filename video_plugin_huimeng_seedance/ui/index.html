@@ -1,0 +1,172 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Huimeng Seedance 配置</title>
+  <style>
+    body { font-family: "Microsoft YaHei", sans-serif; margin: 16px; color: #222; }
+    .row { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+    .hint { font-size: 12px; color: #666; margin-top: 3px; }
+    .warn { background: #fff8e8; border: 1px solid #f2d48a; padding: 8px; border-radius: 6px; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+  <div class="warn">
+    模型参数可选值严格参考《视频模型的params参数说明.md》。<br>
+    注意：`happyhorse-1.0` 不支持 `human_review`、`reference_videos`、`reference_audios`。
+  </div>
+
+  <div class="row">
+    <label for="api_key">API Key</label>
+    <input id="api_key" type="password" placeholder="hm-xxxxxxxx" />
+  </div>
+
+  <div class="row">
+    <label for="model">模型 ID</label>
+    <select id="model"></select>
+  </div>
+
+  <div class="grid">
+    <div class="row">
+      <label for="ratio">ratio</label>
+      <select id="ratio"></select>
+    </div>
+
+    <div class="row">
+      <label for="resolution">resolution</label>
+      <select id="resolution"></select>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="row">
+      <label for="duration">duration (秒)</label>
+      <input id="duration" type="number" min="3" max="15" />
+    </div>
+
+    <div class="row">
+      <label for="tasks_endpoint">tasks endpoint</label>
+      <input id="tasks_endpoint" type="text" value="https://api.huimengi.com/api/v1/tasks" />
+    </div>
+  </div>
+
+  <div class="row">
+    <label><input id="generate_audio" type="checkbox" /> generate_audio</label>
+    <div class="hint">仅 seedance 系列模型有效</div>
+  </div>
+
+  <div class="row">
+    <label><input id="human_review" type="checkbox" /> human_review</label>
+    <div class="hint">仅 seedance 系列模型有效，happyhorse 不支持</div>
+  </div>
+
+  <script>
+    const MODEL_MAP = {
+      "happyhorse-1.0": {
+        ratio: ["16:9", "9:16", "1:1", "4:3", "3:4"],
+        resolution: ["1080P", "720P"],
+        duration: { min: 3, max: 15 },
+        supports: { generate_audio: false, human_review: false }
+      },
+      "seedance-2.0-value": {
+        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
+        resolution: ["720p", "1080p"],
+        duration: { min: 4, max: 15 },
+        supports: { generate_audio: true, human_review: true }
+      },
+      "seedance-2.0-fast-value": {
+        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
+        resolution: ["720p", "1080p"],
+        duration: { min: 4, max: 15 },
+        supports: { generate_audio: true, human_review: true }
+      },
+      "seedance-2.0": {
+        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
+        resolution: ["480p", "720p", "1080p"],
+        duration: { min: 4, max: 15 },
+        supports: { generate_audio: true, human_review: true }
+      },
+      "seedance-2.0-fast": {
+        ratio: ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"],
+        resolution: ["480p", "720p"],
+        duration: { min: 4, max: 15 },
+        supports: { generate_audio: true, human_review: true }
+      }
+    };
+
+    const modelEl = document.getElementById("model");
+    const ratioEl = document.getElementById("ratio");
+    const resolutionEl = document.getElementById("resolution");
+    const durationEl = document.getElementById("duration");
+    const generateAudioEl = document.getElementById("generate_audio");
+    const humanReviewEl = document.getElementById("human_review");
+
+    function refillSelect(el, values) {
+      el.innerHTML = "";
+      values.forEach((v) => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        el.appendChild(opt);
+      });
+    }
+
+    function syncByModel() {
+      const m = modelEl.value;
+      const cfg = MODEL_MAP[m];
+      refillSelect(ratioEl, cfg.ratio);
+      refillSelect(resolutionEl, cfg.resolution);
+      durationEl.min = cfg.duration.min;
+      durationEl.max = cfg.duration.max;
+      if (!durationEl.value) durationEl.value = cfg.duration.min;
+
+      generateAudioEl.disabled = !cfg.supports.generate_audio;
+      if (generateAudioEl.disabled) generateAudioEl.checked = false;
+
+      humanReviewEl.disabled = !cfg.supports.human_review;
+      if (humanReviewEl.disabled) humanReviewEl.checked = false;
+    }
+
+    Object.keys(MODEL_MAP).forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id;
+      modelEl.appendChild(opt);
+    });
+    modelEl.value = "seedance-2.0";
+    syncByModel();
+    modelEl.addEventListener("change", syncByModel);
+
+    window.get_params = function () {
+      return {
+        api_key: document.getElementById("api_key").value,
+        model: modelEl.value,
+        ratio: ratioEl.value,
+        resolution: resolutionEl.value,
+        duration: Number(durationEl.value || 5),
+        tasks_endpoint: document.getElementById("tasks_endpoint").value,
+        generate_audio: !!generateAudioEl.checked,
+        human_review: !!humanReviewEl.checked
+      };
+    };
+
+    window.set_params = function (params) {
+      if (!params) return;
+      document.getElementById("api_key").value = params.api_key || "";
+      if (params.model && MODEL_MAP[params.model]) modelEl.value = params.model;
+      syncByModel();
+      if (params.ratio) ratioEl.value = params.ratio;
+      if (params.resolution) resolutionEl.value = params.resolution;
+      if (params.duration != null) durationEl.value = String(params.duration);
+      document.getElementById("tasks_endpoint").value = params.tasks_endpoint || "https://api.huimengi.com/api/v1/tasks";
+      generateAudioEl.checked = !!params.generate_audio;
+      humanReviewEl.checked = !!params.human_review;
+      syncByModel();
+    };
+  </script>
+</body>
+</html>
