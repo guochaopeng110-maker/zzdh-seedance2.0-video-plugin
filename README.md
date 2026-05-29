@@ -1,6 +1,6 @@
 ﻿# 字字动画视频插件集合
 
-本仓库用于维护 `字字动画.exe` 生态下的视频生成插件，当前主要维护 `video_plugin_huimeng_seedance`（对接 Huimeng 平台 Seedance 系列视频大模型）。
+本仓库用于维护 `字字动画.exe` 生态下的视频生成插件，覆盖 Huimeng、ZLHub、TDuHub、Shuzai 等多个 Seedance 对接平台。
 
 ## 项目简介
 
@@ -8,7 +8,7 @@
 - 目标能力：提交任务 → 轮询状态 → 下载视频
 - 约束：不修改宿主程序，仅通过插件能力扩展
 
-## 仓库结构
+## 插件列表
 
 | 目录 | 说明 |
 |---|---|
@@ -20,8 +20,39 @@
 | `video_plugin_shuzai_seedance/` | 数载 Seedance 2.0 插件 |
 | `video_plugin_geeknow/` | GeekNow 多模型插件（参考） |
 | `video_plugin_zzdhapi/` | ZZDH-API 插件（参考） |
-| `ZZDH-API-seedance/` | ZZDH-API Seedance 独立插件 |
+| `ZZDH-API-seedance/` | ZZDH-API Seedance 独立插件（已废弃） |
 | `docs/` | 需求文档与 API 参考 |
+
+### 插件简介
+
+**video_plugin_huimeng_seedance** — 当前主力插件，对接 Huimeng 中转平台，支持 happyhorse-1.0 / seedance-2.0 / seedance-2.0-fast 等多模型视频生成，配备实时日志、任务日志、参数联动和素材审核完整链路。
+
+**video_plugin_zlhub_seedance** (V1) / **video_plugin_zlhub_seedance_V2** (V2) — 对接 ZLHub 中转平台 Seedance 2.0。V2 在 V1 基础上新增素材审核链路、TOS 临时云存储上传，`tos_ak` / `tos_sk` 固定在后端不再依赖前端输入。
+
+**video_plugin_tduhub_seedance** (V1) / **video_plugin_tduhub_seedance_V2** (V2) — 对接 TDuHub 中转平台 Seedance。V2 同样包含素材审核与 TOS 上传链路。
+
+**video_plugin_shuzai_seedance** — 基于 ZLHub 插件改造，适配数载平台任务接口，禁用 `GET /v1/videos/{task_id}/content` 下载端点，仅走轮询 + 结果下载通道。
+
+**video_plugin_geeknow** — GeekNow 多模型中转插件，作为参考实现。
+
+**video_plugin_zzdhapi** — ZZDH-API 视频生成插件，作为参考实现。
+
+## 仓库结构
+
+```
+zz-video-plugins/
+├── video_plugin_huimeng_seedance/   # 主力插件
+├── video_plugin_zlhub_seedance/     # ZLHub V1
+├── video_plugin_zlhub_seedance_V2/  # ZLHub V2（含审核链路）
+├── video_plugin_tduhub_seedance/    # TDuHub V1
+├── video_plugin_tduhub_seedance_V2/ # TDuHub V2（含审核链路）
+├── video_plugin_shuzai_seedance/    # 数载 Seedance
+├── video_plugin_geeknow/            # GeekNow（参考）
+├── video_plugin_zzdhapi/            # ZZDH-API（参考）
+├── ZZDH-API-seedance/               # （已废弃）
+├── docs/                            # 需求文档与 API 参考
+└── .planning/                       # 项目规划（ROADMAP、阶段计划等）
+```
 
 ## video_plugin_huimeng_seedance 详解
 
@@ -69,6 +100,19 @@
 
 归一化后本地图片自动上传至图床，远程 URL 直接透传。
 
+### 动作 API（handle_action）
+
+插件通过 `handle_action(action, data)` 向前端暴露以下动作：
+
+| 动作 | 说明 | 返回 |
+|---|---|---|
+| `open_live_logs` | 打开实时日志页面 | `{"ok": true, "open_page": "live_log.html"}` |
+| `open_task_logs` | 打开任务日志页面 | `{"ok": true, "open_page": "task_log.html"}` |
+| `get_logs` | 获取实时日志缓冲 | `{"ok": true, "entries": [...]}` |
+| `get_task_logs` | 按条件查询任务日志 | `{"ok": true, "logs": [...]}` |
+
+`get_logs` 支持 `since_index` 参数实现增量拉取；`get_task_logs` 支持 `status` 过滤和 `limit` 分页。
+
 ### 日志体系
 
 插件有三套日志通道：
@@ -107,25 +151,46 @@
 
 ## FAQ
 
-### 1) 报错 `PLUGIN_ERROR:::` 是什么？
+### 通用
+
+**Q: 报错 `PLUGIN_ERROR:::` 是什么？**
 
 插件统一错误前缀，表示错误信息已经过插件层封装，可直接用于定位生成链路问题。
 
-### 2) 为什么任务一直在轮询？
+**Q: 为什么任务一直在轮询？**
 
 检查 API Key、网络连通性、轮询参数（`timeout`/`max_poll_attempts`/`poll_interval`）以及平台侧任务状态。默认首次查询前会等待 3 分钟。
 
-### 3) 图片输入有什么限制？
+**Q: 图片输入有什么限制？**
 
 本插件会校验图片路径；本地图片自动上传至图床。过大或不受支持的格式会被拒绝（错误以 `PLUGIN_ERROR:::` 返回）。
 
-### 4) 报错「输入的图片中有真人敏感信息」
+### 问题排查
+
+**Q: 报错「输入的图片中有真人敏感信息」**
 
 需要在插件界面开启**真人审核（human_review）**开关，勾选后提交任务即可。
 
-### 5) 参考图片报错「参考图片不存在」
+**Q: 参考图片报错「参考图片不存在」**
 
 可能原因：宿主传入的 `reference_images` 格式为非数组（如对象 `{0:...,1:...}`）。当前版本已兼容对象/数组/JSON字符串等多种格式，若仍有问题请检查实时日志中 `reference_input.normalized` 事件的 `raw_type` 字段。
+
+### 插件开发
+
+**Q: 如何新增一个平台插件？**
+
+以现有插件（如 `video_plugin_zlhub_seedance`）为模板：
+1. 复制目录，修改 `get_info()` 中的 `name` / `description`
+2. 修改 API endpoint、认证方式、payload 结构
+3. 调整 `get_params()` 中的参数定义和 UI 表单
+4. 测试「创建任务 → 轮询 → 下载」全链路
+
+**Q: `.planning/` 目录是什么？**
+
+项目采用 GSD（Goal-Structured Development）工作流进行规划：
+- `ROADMAP.md` — 阶段路线图
+- `phases/` — 各阶段的计划（PLAN.md）、上下文（CONTEXT.md）、研究（RESEARCH.md）、总结（SUMMARY.md）
+- `codebase/` — 代码库分析文档（架构、技术栈、约定等）
 
 ## 界面截图
 
